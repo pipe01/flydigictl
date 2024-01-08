@@ -1,0 +1,19 @@
+package protocol
+
+type cmd struct{}
+
+func (cmd) command() {}
+
+type CommandGetDongleVersion struct {
+	cmd
+}
+
+type CommandReadConfig struct {
+	cmd
+	ConfigID byte
+}
+
+type CommandReadLEDConfig struct {
+	cmd
+	ConfigID byte
+}
