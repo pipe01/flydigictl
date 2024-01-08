@@ -3,12 +3,13 @@ package xinput
 import (
 	"flydigi-linux/flydigi/protocol"
 	"flydigi-linux/flydigi/protocol/internal"
+	"flydigi-linux/utils"
 	"fmt"
 	"io"
 	"os"
 	"time"
 
-	"github.com/karalabe/usb"
+	"github.com/google/gousb"
 	"github.com/rs/zerolog/log"
 )
 
@@ -25,7 +26,10 @@ const (
 )
 
 type protocolXInput struct {
-	rw    io.ReadWriteCloser
+	in     io.Reader
+	out    io.Writer
+	closer io.Closer
+
 	msgch chan protocol.Message
 
 	configReader, ledConfigReader *internal.ConfigReader
@@ -34,26 +38,56 @@ type protocolXInput struct {
 }
 
 func Open() (protocol.Protocol, error) {
-	devs, err := usb.EnumerateRaw(0x045e, 0x028e)
+	ctx := gousb.NewContext()
+
+	var closers utils.MultiCloser
+
+	devs, err := ctx.OpenDevices(func(desc *gousb.DeviceDesc) bool {
+		return desc.Vendor == 0x045e && desc.Product == 0x028e
+	})
 	if err != nil {
 		return nil, fmt.Errorf("enumerate devices: %w", err)
 	}
+
+	log.Debug().Int("count", len(devs)).Msg("found xinput usb devices")
 
 	if len(devs) == 0 {
 		return nil, os.ErrNotExist
 	}
 
-	dev, err := devs[0].Open()
+	dev := devs[0]
+	closers.AddCloser(dev)
+
+	cfg, err := dev.Config(1)
 	if err != nil {
-		return nil, fmt.Errorf("open usb device: %w", err)
+		return nil, fmt.Errorf("open configuration: %w", err)
+	}
+	closers.AddCloser(cfg)
+
+	intf, err := cfg.Interface(0, 0)
+	if err != nil {
+		return nil, fmt.Errorf("open interface: %w", err)
+	}
+	closers.AddFunc(intf.Close)
+
+	outep, err := intf.OutEndpoint(5)
+	if err != nil {
+		return nil, fmt.Errorf("open out endpoint: %w", err)
+	}
+
+	inep, err := intf.InEndpoint(1)
+	if err != nil {
+		return nil, fmt.Errorf("open in endpoint: %w", err)
 	}
 
 	p := &protocolXInput{
-		rw:              dev,
+		in:              inep,
+		out:             outep,
+		closer:          &closers,
 		msgch:           make(chan protocol.Message, 10),
 		configReader:    internal.NewConfigReader(packageLength, 10),
 		ledConfigReader: internal.NewConfigReader(ledPackageLength, 10),
-		configWriter:    internal.NewConfigWriter(dev),
+		configWriter:    internal.NewConfigWriter(outep),
 	}
 	go p.readLoop()
 
@@ -61,7 +95,7 @@ func Open() (protocol.Protocol, error) {
 }
 
 func (d *protocolXInput) Close() error {
-	err := d.rw.Close()
+	err := d.closer.Close()
 	close(d.msgch)
 	return err
 }
@@ -74,7 +108,7 @@ func (d *protocolXInput) readLoop() {
 	buf := make([]byte, 100)
 
 	for {
-		n, err := d.rw.Read(buf)
+		n, err := d.in.Read(buf)
 		if err != nil {
 			break
 		}
@@ -183,7 +217,7 @@ func (d *protocolXInput) sendCommand(cmd byte, args ...byte) error {
 	pkg[1] = cmd
 	copy(pkg[2:], args)
 
-	_, err := d.rw.Write(crcData(pkg))
+	_, err := d.out.Write(crcData(pkg))
 	return err
 }
 

@@ -2,24 +2,36 @@ package main
 
 import (
 	"flydigi-linux/flydigi"
-	"time"
+	"flydigi-linux/flydigi/config"
+	"io"
+	"os"
 
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
 	"pault.ag/go/modprobe"
+
+	golog "log"
 )
 
 func main() {
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+
+	golog.SetOutput(io.Discard) // Supress github.com/google/gousb logging
+
 	err := modprobe.Remove("xpad")
 	if err == nil {
-		// defer func() {
-		// 	err = modprobe.Load("xpad", "")
-		// 	if err != nil {
-		// 		log.Err(err).Msg("failed to load xpad module")
-		// 	}
-		// }()
+		log.Info().Msg("unloaded xpad module")
+
+		defer func() {
+			log.Info().Msg("loading xpad module")
+
+			err = modprobe.Load("xpad", "")
+			if err != nil {
+				log.Err(err).Msg("failed to load xpad module")
+			}
+		}()
 	}
-	defer time.Sleep(1 * time.Second)
 
 	dev, err := flydigi.OpenGamepad()
 	if err != nil {
@@ -40,12 +52,12 @@ func main() {
 	if true {
 		cfg.JoyMapping.LeftJoystic.Curve.Zero = 1
 
-		// cfg.Basic.NewLedConfig.SetSteady(config.LedUnit{
-		// 	R: 0,
-		// 	G: 0,
-		// 	B: 255,
-		// })
-		cfg.Basic.NewLedConfig.SetStreamlined()
+		cfg.Basic.NewLedConfig.SetSteady(config.LedUnit{
+			R: 0,
+			G: 255,
+			B: 0,
+		})
+		//cfg.Basic.NewLedConfig.SetStreamlined()
 
 		dev.SaveConfig(cfg)
 	}

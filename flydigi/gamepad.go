@@ -149,6 +149,8 @@ func (g *Gamepad) handleMessage(msg protocol.Message) error {
 }
 
 func (g *Gamepad) handleDeviceInfo(msg protocol.MessageGamePadInfo) error {
+	log.Debug().Uint8("deviceid", msg.DeviceID).Msg("got device info")
+
 	g.devInfo = FDGDeviceInfo{}
 
 	g.devInfo.DeviceId = int32(msg.DeviceID)
@@ -265,6 +267,8 @@ func (g *Gamepad) handleDongleInfo(msg protocol.MessageDongleInfo) error {
 }
 
 func (g *Gamepad) handleGamepadConfigRead(msg protocol.MessageGamepadConfigReadCB) error {
+	log.Debug().Int("length", len(msg.Data)).Msg("got gamepad configuration data")
+
 	cfg, err := config.ConvertGPConfigByByte(msg.Data)
 	if err != nil {
 		return fmt.Errorf("convert GP config: %w", err)
@@ -277,6 +281,8 @@ func (g *Gamepad) handleGamepadConfigRead(msg protocol.MessageGamepadConfigReadC
 }
 
 func (g *Gamepad) handleLEDConfigRead(msg protocol.MessageLEDConfigReadCB) error {
+	log.Debug().Int("length", len(msg.Data)).Msg("got led configuration data")
+
 	cfg := config.ConvertLEDConfigByByte(msg.Data)
 
 	if g.currConfig.Value != nil {
@@ -293,6 +299,8 @@ func (g *Gamepad) SaveConfig(cfg *config.AllConfigBean) error {
 	var buf bytes.Buffer
 	config.ConvertByteByGConfig(&buf, cfg)
 
+	log.Info().Int("length", buf.Len()).Msg("saving gamepad configuration")
+
 	if err := g.prot.Send(protocol.CommandSendConfig{
 		Data:     buf.Bytes(),
 		ConfigID: g.configID,
@@ -302,6 +310,8 @@ func (g *Gamepad) SaveConfig(cfg *config.AllConfigBean) error {
 
 	buf.Reset()
 	config.ConvertByteByNewLedConfig(&buf, cfg.Basic.NewLedConfig)
+
+	log.Info().Int("length", buf.Len()).Msg("saving led configuration")
 
 	if err := g.prot.Send(protocol.CommandSendLEDConfig{
 		Data:     buf.Bytes(),
