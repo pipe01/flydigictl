@@ -1,20 +1,20 @@
 package dinput
 
 import (
-	"errors"
 	"flydigi-linux/flydigi/protocol"
+	"flydigi-linux/flydigi/protocol/internal"
 	"fmt"
 	"io"
-	"sync"
+	"os"
 	"time"
 
+	"github.com/karalabe/usb"
 	"github.com/rs/zerolog/log"
 )
 
 const (
 	packageLength    = 52
 	ledPackageLength = 49
-	maxParcelLength  = 10
 )
 
 const (
@@ -33,21 +33,44 @@ type protocolDInput struct {
 	rw    io.ReadWriteCloser
 	msgch chan protocol.Message
 
-	transLock     sync.Mutex
-	sendingConfig *configTrasmission
+	configWriter *internal.ConfigWriter
 
-	configData    [packageLength * 10]byte
-	ledConfigData [ledPackageLength * 10]byte
+	configReader, ledConfigReader *internal.ConfigReader
 }
 
-func Open(rw io.ReadWriteCloser) protocol.Protocol {
-	p := &protocolDInput{
-		rw:    rw,
-		msgch: make(chan protocol.Message, 10),
+func Open() (protocol.Protocol, error) {
+	devs, err := usb.EnumerateHid(0x04b4, 0x2412)
+	if err != nil {
+		return nil, fmt.Errorf("enumerate devices: %w", err)
 	}
-	go p.readLoop()
 
-	return p
+	if len(devs) == 0 {
+		return nil, os.ErrNotExist
+	}
+
+	p := &protocolDInput{
+		msgch:           make(chan protocol.Message, 10),
+		configReader:    internal.NewConfigReader(packageLength, 10),
+		ledConfigReader: internal.NewConfigReader(ledPackageLength, 10),
+	}
+
+	for _, d := range devs {
+		if d.Interface == 2 {
+			dev, err := d.Open()
+			if err != nil {
+				return nil, fmt.Errorf("open usb device: %w", err)
+			}
+
+			p.rw = dev
+			p.configWriter = internal.NewConfigWriter(dev)
+
+			go p.readLoop()
+
+			return p, nil
+		}
+	}
+
+	return nil, os.ErrNotExist
 }
 
 func (d *protocolDInput) Close() error {
@@ -84,9 +107,11 @@ func (d *protocolDInput) Send(cmd protocol.Command) error {
 		return d.sendCommand(commandGetDongleVersion)
 
 	case protocol.CommandReadConfig:
+		d.configReader.Reset()
 		return d.sendCommand(commandReadConfig, cmd.ConfigID)
 
 	case protocol.CommandReadLEDConfig:
+		d.ledConfigReader.Reset()
 		return d.sendCommand(commandReadLEDConfig, cmd.ConfigID)
 
 	case protocol.CommandSendConfig:
@@ -101,9 +126,6 @@ func (d *protocolDInput) Send(cmd protocol.Command) error {
 }
 
 func (g *protocolDInput) sendConfig(data []byte, configID byte, isLED bool) error {
-	g.transLock.Lock()
-	defer g.transLock.Unlock()
-
 	var chunks [][]byte
 	if isLED {
 		chunks = getLEDConfigDataParcels(data, configID)
@@ -111,47 +133,7 @@ func (g *protocolDInput) sendConfig(data []byte, configID byte, isLED bool) erro
 		chunks = getConfigDataParcels(data, configID)
 	}
 
-	g.sendingConfig = &configTrasmission{
-		chunks: chunks,
-		ackch:  make(chan int),
-	}
-	defer func() {
-		g.sendingConfig = nil
-	}()
-
-	for i, chunk := range chunks {
-		retriesLeft := 3
-		success := false
-
-		for !success && retriesLeft > 0 {
-			retriesLeft--
-
-			_, err := g.rw.Write(chunk)
-			if err != nil {
-				return fmt.Errorf("write chunk: %w", err)
-			}
-
-			for {
-				select {
-				case ack := <-g.sendingConfig.ackch:
-					if ack < i {
-						continue // Invalid ack number
-					}
-					success = true
-
-				case <-time.After(1 * time.Second):
-				}
-
-				break
-			}
-		}
-
-		if !success {
-			return errors.New("device didn't respond")
-		}
-	}
-
-	return nil
+	return g.configWriter.Send(chunks, 3, 3*time.Second)
 }
 
 func (d *protocolDInput) sendCommand(cmd byte, args ...byte) error {
@@ -159,7 +141,7 @@ func (d *protocolDInput) sendCommand(cmd byte, args ...byte) error {
 
 	buf := make([]byte, 12)
 	buf[0] = 5
-	buf[1] = byte(cmd)
+	buf[1] = cmd
 	copy(buf[2:], args)
 
 	_, err := d.rw.Write(buf)
@@ -168,9 +150,15 @@ func (d *protocolDInput) sendCommand(cmd byte, args ...byte) error {
 
 func (d *protocolDInput) resolveUsbData(p []byte) (msg protocol.Message, ok bool) {
 	if p[15] == 235 {
-		if d.handleConfigRead(p, packageLength, d.configData[:]) {
+		d.configReader.GotPackage(int(p[3]), p[5:15])
+
+		if d.configReader.IsFinished() {
+			// Wait for transmission to finish
+			//TODO: Do it better
+			time.Sleep(200 * time.Millisecond)
+
 			return protocol.MessageGamepadConfigReadCB{
-				Data: d.configData[:],
+				Data: d.configReader.Data(),
 			}, true
 		}
 
@@ -178,9 +166,15 @@ func (d *protocolDInput) resolveUsbData(p []byte) (msg protocol.Message, ok bool
 	}
 
 	if p[15] == 229 {
-		if d.handleConfigRead(p, ledPackageLength, d.ledConfigData[:]) {
+		d.ledConfigReader.GotPackage(int(p[3]), p[5:15])
+
+		if d.ledConfigReader.IsFinished() {
+			// Wait for transmission to finish
+			//TODO: Do it better
+			time.Sleep(200 * time.Millisecond)
+
 			return protocol.MessageLEDConfigReadCB{
-				Data: d.ledConfigData[:],
+				Data: d.ledConfigReader.Data(),
 			}, true
 		}
 
@@ -196,12 +190,7 @@ func (d *protocolDInput) resolveUsbData(p []byte) (msg protocol.Message, ok bool
 	}
 
 	if p[15] == 234 || p[15] == 231 || p[15] == 51 {
-		if d.sendingConfig != nil {
-			select {
-			case d.sendingConfig.ackch <- int(p[3]):
-			default:
-			}
-		}
+		d.configWriter.Ack(int(p[3]))
 
 		return nil, false
 	}
@@ -250,25 +239,4 @@ func (d *protocolDInput) resolveUsbData(p []byte) (msg protocol.Message, ok bool
 	}
 
 	return nil, false
-}
-
-func (d *protocolDInput) handleConfigRead(p []byte, packageCount int32, fullData []byte) (isDone bool) {
-	packageIndex := int32(p[3])
-	if packageIndex > packageCount {
-		return false
-	}
-
-	println(packageIndex)
-	data := p[5:15]
-
-	copy(fullData[packageIndex*10:], data)
-
-	if packageIndex == packageCount {
-		// Wait for transmission to finish
-		//TODO: Do it better
-		time.Sleep(200 * time.Millisecond)
-		return true
-	}
-
-	return false
 }

@@ -87,6 +87,13 @@ func (b *NewLedConfigBean) SetSteady(color LedUnit) {
 	}
 }
 
+func (b *NewLedConfigBean) SetStreamlined() {
+	b.LedMode = LedModeStreamlined
+	b.Loop_End = 5
+	b.Rgb_num = 5
+	b.LedGroups = getLedGroupList(0, 5)
+}
+
 type LedGroup struct {
 	Units []*LedUnit
 }

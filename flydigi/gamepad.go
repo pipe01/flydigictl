@@ -6,14 +6,14 @@ import (
 	"flydigi-linux/flydigi/config"
 	"flydigi-linux/flydigi/protocol"
 	"flydigi-linux/flydigi/protocol/dinput"
+	"flydigi-linux/flydigi/protocol/xinput"
 	"flydigi-linux/utils"
 	"fmt"
-	"io"
 	"net"
 	"os"
 	"sync"
+	"time"
 
-	"github.com/karalabe/usb"
 	"github.com/rs/zerolog/log"
 )
 
@@ -95,22 +95,16 @@ type Gamepad struct {
 }
 
 func OpenGamepad() (*Gamepad, error) {
-	var prot protocol.Protocol
-
-	dev, err := openDeviceDInput()
-	if err == nil {
-		prot = dinput.Open(dev)
-	} else {
+	prot, err := dinput.Open()
+	if err != nil {
 		if err != os.ErrNotExist {
 			return nil, fmt.Errorf("open dinput device: %w", err)
 		}
 
-		dev, err = openDeviceXInput()
+		prot, err = xinput.Open()
 		if err != nil {
 			return nil, fmt.Errorf("open xinput device: %w", err)
 		}
-
-		// prot = protocol.OpenXInput(dev)
 	}
 
 	gamepad := &Gamepad{
@@ -121,38 +115,6 @@ func OpenGamepad() (*Gamepad, error) {
 	go gamepad.readLoop()
 
 	return gamepad, nil
-}
-
-func openDeviceDInput() (io.ReadWriteCloser, error) {
-	devs, err := usb.EnumerateHid(0x04b4, 0x2412)
-	if err != nil {
-		return nil, fmt.Errorf("enumerate devices: %w", err)
-	}
-
-	if len(devs) == 0 {
-		return nil, os.ErrNotExist
-	}
-
-	for _, d := range devs {
-		if d.Interface == 2 {
-			return d.Open()
-		}
-	}
-
-	return nil, os.ErrNotExist
-}
-
-func openDeviceXInput() (io.ReadWriteCloser, error) {
-	devs, err := usb.EnumerateRaw(0x045e, 0x028e)
-	if err != nil {
-		return nil, fmt.Errorf("enumerate devices: %w", err)
-	}
-
-	if len(devs) == 0 {
-		return nil, os.ErrNotExist
-	}
-
-	return devs[0].Open()
 }
 
 func (g *Gamepad) Close() error {
@@ -351,30 +313,36 @@ func (g *Gamepad) SaveConfig(cfg *config.AllConfigBean) error {
 	return nil
 }
 
+func getConfigRetry[T any](prot protocol.Protocol, v *utils.CondValue[T], cmd protocol.Command) (*T, error) {
+	if v.Value == nil {
+		retriesLeft := 3
+
+		for retriesLeft > 0 {
+			err := prot.Send(cmd)
+			if err != nil {
+				return nil, fmt.Errorf("send command: %w", err)
+			}
+
+			select {
+			case <-v.NotifyChan():
+			case <-time.After(2 * time.Second):
+				retriesLeft--
+				continue
+			}
+
+			return v.Value, nil
+		}
+
+		return nil, errors.New("device doesn't respond")
+	}
+
+	return v.Value, nil
+}
+
 func (g *Gamepad) GetConfig() (*config.AllConfigBean, error) {
-	if g.currConfig.Value != nil {
-		return g.currConfig.Value, nil
-	}
-
-	err := g.prot.Send(protocol.CommandReadConfig{ConfigID: g.configID})
-	if err != nil {
-		return nil, fmt.Errorf("send command: %w", err)
-	}
-
-	<-g.currConfig.NotifyChan()
-	return g.currConfig.Value, nil
+	return getConfigRetry(g.prot, g.currConfig, protocol.CommandReadConfig{ConfigID: g.configID})
 }
 
 func (g *Gamepad) GetLEDConfig() (*config.NewLedConfigBean, error) {
-	if g.currLEDConfig.Value != nil {
-		return g.currLEDConfig.Value, nil
-	}
-
-	err := g.prot.Send(protocol.CommandReadLEDConfig{ConfigID: g.configID})
-	if err != nil {
-		return nil, fmt.Errorf("send command: %w", err)
-	}
-
-	<-g.currLEDConfig.NotifyChan()
-	return g.currLEDConfig.Value, nil
+	return getConfigRetry(g.prot, g.currLEDConfig, protocol.CommandReadLEDConfig{ConfigID: g.configID})
 }

@@ -11,6 +11,8 @@ require (
 require (
 	github.com/gookit/color v1.5.4 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
+	pault.ag/go/modprobe v0.1.2 // indirect
+	pault.ag/go/topsort v0.0.0-20160530003732-f98d2ad46e1a // indirect
 )
 
 require (

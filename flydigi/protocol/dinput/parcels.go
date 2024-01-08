@@ -6,6 +6,8 @@ import (
 	"math"
 )
 
+const maxParcelLength = 10
+
 func splitParcels(start func(parcelCount int) []byte, innerCmd, configID byte, data []byte) [][]byte {
 	parcelCount := int(math.Ceil(float64(len(data)) / maxParcelLength))
 
