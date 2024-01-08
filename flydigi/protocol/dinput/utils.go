@@ -1,7 +1,8 @@
-package flydigi
+package dinput
 
 import (
 	"bytes"
+	"flydigi-linux/utils"
 	"math"
 )
 
@@ -36,7 +37,7 @@ func splitParcels(start func(parcelCount int) []byte, innerCmd, configID byte, d
 		buf.WriteByte(byte(i))
 	}
 
-	return splitSlice(buf.Bytes(), maxParcelLength+4)
+	return utils.SplitSlice(buf.Bytes(), maxParcelLength+4)
 }
 
 // FormatterWriteFullData
@@ -62,18 +63,4 @@ func getLEDConfigDataParcels(data []byte, configID byte) [][]byte {
 			byte(parcelCount),
 		}
 	}, 51, configID, data)
-}
-
-func splitSlice[T any](s []T, chunkSize int) [][]T {
-	var chunks [][]T
-
-	i := 0
-	for ; i < len(s)-chunkSize; i += chunkSize {
-		chunks = append(chunks, s[i:i+chunkSize])
-	}
-	if i < len(s) {
-		chunks = append(chunks, s[i:])
-	}
-
-	return chunks
 }

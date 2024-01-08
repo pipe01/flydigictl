@@ -1,10 +1,14 @@
 package main
 
 import (
+	"flydigi-linux/flydigi"
+	"flydigi-linux/flydigi/config"
 	"fmt"
+	"os"
 	"sync/atomic"
 	"time"
 
+	"github.com/gookit/goutil/dump"
 	"github.com/karalabe/usb"
 	"github.com/rs/zerolog/log"
 )
@@ -70,48 +74,48 @@ func xinputTest() error {
 }
 
 func main() {
-	if err := xinputTest(); err != nil {
-		log.Fatal().Err(err).Msg("failed to run test")
+	// if err := xinputTest(); err != nil {
+	// 	log.Fatal().Err(err).Msg("failed to run test")
+	// }
+
+	dev, err := flydigi.OpenGamepad()
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to connect to gamepad")
+	}
+	defer dev.Close()
+
+	cfg, err := dev.GetConfig()
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to read configuration")
 	}
 
-	// dev, err := flydigi.OpenGamepad()
-	// if err != nil {
-	// 	log.Fatal().Err(err).Msg("failed to connect to gamepad")
-	// }
-	// defer dev.Close()
+	_, err = dev.GetLEDConfig()
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to read LED configuration")
+	}
 
-	// cfg, err := dev.GetConfig()
-	// if err != nil {
-	// 	log.Fatal().Err(err).Msg("failed to read configuration")
-	// }
+	if true {
+		cfg.Basic.NewLedConfig.SetSteady(config.LedUnit{
+			R: 0,
+			G: 255,
+			B: 255,
+		})
 
-	// _, err = dev.GetLEDConfig()
-	// if err != nil {
-	// 	log.Fatal().Err(err).Msg("failed to read LED configuration")
-	// }
+		dev.SaveConfig(cfg)
+	}
 
-	// if true {
-	// 	cfg.Basic.NewLedConfig.SetSteady(config.LedUnit{
-	// 		R: 255,
-	// 		G: 0,
-	// 		B: 0,
-	// 	})
+	f, _ := os.Create("config.dmp")
+	defer f.Close()
 
-	// 	dev.SaveConfig(cfg)
-	// }
+	d := dump.NewDumper(f, 0)
+	d.Options.MaxDepth = 100
+	d.Dump(cfg)
+	return
 
-	// f, _ := os.Create("config.dmp")
-	// defer f.Close()
+	// cfg.JoyMapping.LeftJoystic.Curve.Zero = 50
 
-	// d := dump.NewDumper(f, 0)
-	// d.Options.MaxDepth = 100
-	// d.Dump(cfg)
-	// return
+	// dev.SaveConfig(cfg)
 
-	// // cfg.JoyMapping.LeftJoystic.Curve.Zero = 50
-
-	// // dev.SaveConfig(cfg)
-
-	// log.Print("done")
-	// select {}
+	log.Print("done")
+	select {}
 }

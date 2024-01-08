@@ -4,14 +4,24 @@ import (
 	"bytes"
 	"errors"
 	"flydigi-linux/flydigi/config"
+	"flydigi-linux/flydigi/protocol"
+	"flydigi-linux/flydigi/protocol/dinput"
 	"flydigi-linux/utils"
 	"fmt"
+	"io"
 	"net"
+	"os"
 	"sync"
-	"time"
 
+	"github.com/karalabe/usb"
 	"github.com/rs/zerolog/log"
-	"github.com/sstallion/go-hid"
+)
+
+type deviceMode int
+
+const (
+	deviceModeXInput deviceMode = iota + 1
+	deviceModeDInput
 )
 
 type FDGConncetType int32
@@ -62,12 +72,6 @@ type FDGDeviceInfo struct {
 	IsIP                bool
 }
 
-const (
-	packageLength    = 52
-	ledPackageLength = 49
-	maxParcelLength  = 10
-)
-
 type CommandNumber byte
 
 const (
@@ -79,15 +83,8 @@ const (
 
 type commandCallbackFunc func(data []byte)
 
-type configTrasmission struct {
-	chunks [][]byte
-	ackch  chan int
-}
-
 type Gamepad struct {
-	dev *hid.Device
-
-	transLock sync.Mutex
+	prot protocol.Protocol
 
 	devInfo FDGDeviceInfo
 
@@ -95,32 +92,29 @@ type Gamepad struct {
 	currLEDConfig *utils.CondValue[config.NewLedConfigBean]
 
 	configID byte
-
-	configData    [packageLength * 10]byte
-	ledConfigData [ledPackageLength * 10]byte
-
-	sendingConfig *configTrasmission
 }
 
 func OpenGamepad() (*Gamepad, error) {
-	var devices []string
+	var prot protocol.Protocol
 
-	hid.Enumerate(0x04b4, 0x2412, func(info *hid.DeviceInfo) error {
-		devices = append(devices, info.Path)
-		return nil
-	})
+	dev, err := openDeviceDInput()
+	if err == nil {
+		prot = dinput.Open(dev)
+	} else {
+		if err != os.ErrNotExist {
+			return nil, fmt.Errorf("open dinput device: %w", err)
+		}
 
-	if len(devices) == 0 {
-		return nil, errors.New("can't find gamepad")
-	}
+		dev, err = openDeviceXInput()
+		if err != nil {
+			return nil, fmt.Errorf("open xinput device: %w", err)
+		}
 
-	dev, err := hid.OpenPath(devices[3])
-	if err != nil {
-		return nil, fmt.Errorf("open device: %w", err)
+		// prot = protocol.OpenXInput(dev)
 	}
 
 	gamepad := &Gamepad{
-		dev:           dev,
+		prot:          prot,
 		currConfig:    utils.NewCondValue[config.AllConfigBean](&sync.Mutex{}),
 		currLEDConfig: utils.NewCondValue[config.NewLedConfigBean](&sync.Mutex{}),
 	}
@@ -129,107 +123,73 @@ func OpenGamepad() (*Gamepad, error) {
 	return gamepad, nil
 }
 
+func openDeviceDInput() (io.ReadWriteCloser, error) {
+	devs, err := usb.EnumerateHid(0x04b4, 0x2412)
+	if err != nil {
+		return nil, fmt.Errorf("enumerate devices: %w", err)
+	}
+
+	if len(devs) == 0 {
+		return nil, os.ErrNotExist
+	}
+
+	for _, d := range devs {
+		if d.Interface == 2 {
+			return d.Open()
+		}
+	}
+
+	return nil, os.ErrNotExist
+}
+
+func openDeviceXInput() (io.ReadWriteCloser, error) {
+	devs, err := usb.EnumerateRaw(0x045e, 0x028e)
+	if err != nil {
+		return nil, fmt.Errorf("enumerate devices: %w", err)
+	}
+
+	if len(devs) == 0 {
+		return nil, os.ErrNotExist
+	}
+
+	return devs[0].Open()
+}
+
 func (g *Gamepad) Close() error {
-	return g.dev.Close()
+	return g.prot.Close()
 }
 
 func (g *Gamepad) readLoop() {
-	buf := make([]byte, 32)
-
-	for {
-		n, err := g.dev.Read(buf)
-		if err != nil {
-			break
-		}
-
-		data := buf[:n]
-
-		if err := g.resolveUsbData(data); err != nil {
+	for msg := range g.prot.Messages() {
+		if err := g.handleMessage(msg); err != nil {
 			log.Err(err).Msg("failed to handle usb data")
 		}
 	}
 }
 
-func (g *Gamepad) resolveUsbData(p []byte) error {
-	// log.Debug().Int("len", len(p)).Msg("got usb data")
+func (g *Gamepad) handleMessage(msg protocol.Message) error {
+	switch msg := msg.(type) {
+	case protocol.MessageGamePadInfo:
+		return g.handleDeviceInfo(msg)
 
-	if p[15] == 235 {
-		log.Debug().Str("handler", "GamepadConfigReadCB").Msg("got usb response")
-		return g.handleGamepadConfigRead(p)
+	case protocol.MessageDongleInfo:
+		return g.handleDongleInfo(msg)
+
+	case protocol.MessageGamepadConfigReadCB:
+		return g.handleGamepadConfigRead(msg)
+
+	case protocol.MessageLEDConfigReadCB:
+		return g.handleLEDConfigRead(msg)
+
+	default:
+		return errors.New("unknown message type")
 	}
-
-	if p[15] == 229 {
-		log.Debug().Str("handler", "LEDConfigReadCB").Msg("got usb response")
-		return g.handleLEDConfigRead(p)
-	}
-
-	if p[0] == 4 && p[1] == 17 {
-		log.Debug().Str("handler", "HandleDongleInfo").Msg("got usb response")
-		return g.handleDongleInfo(p)
-	}
-
-	if p[15] == 234 || p[15] == 231 || p[15] == 51 {
-		log.Debug().Str("handler", "WriteGamepadConfigCBK").Msg("got usb response")
-
-		if g.sendingConfig != nil {
-			select {
-			case g.sendingConfig.ackch <- int(p[3]):
-			default:
-				log.Debug().Msg("dropped config write ack")
-			}
-		} else {
-			log.Debug().Msg("missed config write ack")
-		}
-
-		return nil
-	}
-
-	if p[15] == 236 {
-		//TODO: Check acks
-		log.Debug().Str("handler", "GamePadInfo").Msg("got usb response")
-		return g.handleDeviceInfo(p)
-	}
-
-	if p[3] == 245 && p[4] == 1 {
-		//TODO: Check acks
-		log.Debug().Str("handler", "ExtensionChipInfo").Msg("got usb response")
-		return nil
-	}
-
-	if p[3] == 242 && p[4] == 3 {
-		log.Debug().Str("handler", "ScreenInfo").Msg("got usb response")
-		return nil
-	}
-
-	if p[3] == 242 && p[4] == 4 {
-		log.Debug().Str("handler", "ScreenInfoSleepTime").Msg("got usb response")
-		return nil
-	}
-
-	if p[0] == 4 && (p[1] == 240 || p[1] == 35) {
-		log.Debug().Str("handler", "PicData").Msg("got usb response")
-		return nil
-	}
-
-	if p[0] == 90 && p[1] == 165 && p[2] == 209 && p[4] == 0 {
-		log.Debug().Str("handler", "WritePicData").Msg("got usb response")
-		return nil
-	}
-
-	if p[3] == 250 && p[4] == 160 {
-		log.Debug().Str("handler", "UUIDCB").Msg("got usb response")
-		return nil
-	}
-
-	return nil
 }
 
-func (g *Gamepad) handleDeviceInfo(data []byte) error {
+func (g *Gamepad) handleDeviceInfo(msg protocol.MessageGamePadInfo) error {
 	g.devInfo = FDGDeviceInfo{}
 
-	deviceId := data[3]
-
-	g.devInfo.DeviceId = int32(deviceId)
+	g.devInfo.DeviceId = int32(msg.DeviceID)
 	// if (!GameHandleListDic.gameHandleDic.ContainsKey((int)deviceId))
 	// {
 	// 	return;
@@ -238,18 +198,17 @@ func (g *Gamepad) handleDeviceInfo(data []byte) error {
 	// currentDeviceInfo.GameHadleName = GameHandleListDic.gameHandleDic[(int)deviceId].GameHadleName;
 	// currentDeviceInfo.FirmwareName = GameHandleListDic.gameHandleDic[(int)deviceId].FirmwareName;
 
-	deviceMac := data[5:9]
-	g.devInfo.DeviceMac = net.HardwareAddr(deviceMac).String()
+	g.devInfo.DeviceMac = net.HardwareAddr(msg.DeviceMac).String()
 
-	fw_l := data[9] & 15
-	fw_l_2 := data[9] >> 4
-	fw_h := data[10] & 15
-	fw_h_2 := data[10] >> 4
+	fw_l := msg.FW_L & 15
+	fw_l_2 := msg.FW_L >> 4
+	fw_h := msg.FW_H & 15
+	fw_h_2 := msg.FW_H >> 4
 
 	g.devInfo.FirmwareVersionCode = int32(fw_h_2)*1000 + int32(fw_h)*100 + int32(fw_l_2)*10 + int32(fw_l)
 	g.devInfo.FirmwareVersion = fmt.Sprintf("%d.%d.%d.%d", fw_h_2, fw_h, fw_l_2, fw_l)
 
-	battery := data[11]
+	battery := msg.Battery
 	const apex2MinBY = 98
 	const apex2MaxBY = 114
 
@@ -262,14 +221,14 @@ func (g *Gamepad) handleDeviceInfo(data []byte) error {
 	batteryPercent := int(100 * float32(battery-apex2MinBY) / float32(apex2MaxBY-apex2MinBY))
 	g.devInfo.BatteryPercent = int32(batteryPercent)
 
-	switch data[14] {
+	switch msg.MotionSensorType {
 	case 1:
 		g.devInfo.MotionSensorType = "ST"
 	case 2:
 		g.devInfo.MotionSensorType = "QST"
 	}
 
-	if data[12] > 0 {
+	if msg.CPUType > 0 {
 		g.devInfo.CpuType = "wch"
 	} else {
 		g.devInfo.CpuType = "nordic"
@@ -280,13 +239,13 @@ func (g *Gamepad) handleDeviceInfo(data []byte) error {
 	}
 
 	if g.devInfo.CpuType == "wch" {
-		if data[13] == 1 {
+		if msg.ConnectionType == 1 {
 			g.devInfo.ConnectType = FDGConncetWired
 			g.devInfo.CpuName = "ch573"
 		} else {
 			g.devInfo.ConnectType = FDGConncetWireless
 			g.devInfo.CpuName = "ch571"
-			g.SendCommand(CommandGetDongleVersion)
+			g.prot.Send(protocol.CommandGetDongleVersion{})
 		}
 	}
 
@@ -327,11 +286,11 @@ func (g *Gamepad) handleDeviceInfo(data []byte) error {
 	return nil
 }
 
-func (g *Gamepad) handleDongleInfo(data []byte) error {
-	fw_l := data[2] & 15
-	fw_l_2 := data[2] >> 4
-	fw_h := data[3] & 15
-	fw_h_2 := data[3] >> 4
+func (g *Gamepad) handleDongleInfo(msg protocol.MessageDongleInfo) error {
+	fw_l := msg.FW_L & 15
+	fw_l_2 := msg.FW_L >> 4
+	fw_h := msg.FW_H & 15
+	fw_h_2 := msg.FW_H >> 4
 
 	if fw_l+fw_l_2+fw_h+fw_h_2 > 0 {
 		g.devInfo.DongleVersion = fmt.Sprintf("%d.%d.%d.%d", fw_l_2, fw_l, fw_h_2, fw_h)
@@ -343,21 +302,8 @@ func (g *Gamepad) handleDongleInfo(data []byte) error {
 	return nil
 }
 
-func (g *Gamepad) handleGamepadConfigRead(p []byte) error {
-	packageIndex := int32(p[3])
-	if packageIndex > packageLength {
-		return nil
-	}
-
-	data := p[5:15]
-
-	copy(g.configData[packageIndex*10:], data)
-
-	if packageIndex != 52 {
-		return nil
-	}
-
-	cfg, err := config.ConvertGPConfigByByte(g.configData[:])
+func (g *Gamepad) handleGamepadConfigRead(msg protocol.MessageGamepadConfigReadCB) error {
+	cfg, err := config.ConvertGPConfigByByte(msg.Data)
 	if err != nil {
 		return fmt.Errorf("convert GP config: %w", err)
 	}
@@ -368,21 +314,8 @@ func (g *Gamepad) handleGamepadConfigRead(p []byte) error {
 	return nil
 }
 
-func (g *Gamepad) handleLEDConfigRead(p []byte) error {
-	packageIndex := int32(p[3])
-	if packageIndex > packageLength {
-		return nil
-	}
-
-	data := p[5:15]
-
-	copy(g.ledConfigData[packageIndex*10:], data)
-
-	if packageIndex != ledPackageLength {
-		return nil
-	}
-
-	cfg := config.ConvertLEDConfigByByte(g.ledConfigData[:])
+func (g *Gamepad) handleLEDConfigRead(msg protocol.MessageLEDConfigReadCB) error {
+	cfg := config.ConvertLEDConfigByByte(msg.Data)
 
 	if g.currConfig.Value != nil {
 		g.currConfig.Value.Basic.NewLedConfig = cfg
@@ -394,123 +327,54 @@ func (g *Gamepad) handleLEDConfigRead(p []byte) error {
 	return nil
 }
 
-func (g *Gamepad) sendConfig(data [][]byte) error {
-	g.transLock.Lock()
-	defer g.transLock.Unlock()
-
-	g.sendingConfig = &configTrasmission{
-		chunks: data,
-		ackch:  make(chan int),
-	}
-	defer func() {
-		g.sendingConfig = nil
-	}()
-
-	for i, chunk := range data {
-		retriesLeft := 3
-		success := false
-
-		for !success && retriesLeft > 0 {
-			retriesLeft--
-
-			// p := append([]byte{2}, chunk...)
-
-			_, err := g.dev.Write(chunk)
-			if err != nil {
-				return fmt.Errorf("write chunk: %w", err)
-			}
-
-			for {
-				select {
-				case ack := <-g.sendingConfig.ackch:
-					if ack < i {
-						continue // Invalid ack number
-					}
-					success = true
-
-				case <-time.After(1 * time.Second):
-				}
-
-				break
-			}
-		}
-
-		if !success {
-			return errors.New("device didn't respond")
-		}
-	}
-
-	return nil
-}
-
 func (g *Gamepad) SaveConfig(cfg *config.AllConfigBean) error {
 	var buf bytes.Buffer
 	config.ConvertByteByGConfig(&buf, cfg)
 
-	chunks := getConfigDataParcels(buf.Bytes(), g.configID)
-
-	if err := g.sendConfig(chunks); err != nil {
+	if err := g.prot.Send(protocol.CommandSendConfig{
+		Data:     buf.Bytes(),
+		ConfigID: g.configID,
+	}); err != nil {
 		return fmt.Errorf("send config: %w", err)
 	}
 
 	buf.Reset()
 	config.ConvertByteByNewLedConfig(&buf, cfg.Basic.NewLedConfig)
 
-	chunks = getLEDConfigDataParcels(buf.Bytes(), g.configID)
-
-	if err := g.sendConfig(chunks); err != nil {
-		return fmt.Errorf("send led config: %w", err)
+	if err := g.prot.Send(protocol.CommandSendLEDConfig{
+		Data:     buf.Bytes(),
+		ConfigID: g.configID,
+	}); err != nil {
+		return fmt.Errorf("send config: %w", err)
 	}
 
 	return nil
 }
 
-func readCondRetry[T any](g *Gamepad, cmd CommandNumber, cond *utils.CondValue[T]) (*T, error) {
-	g.transLock.Lock()
-	defer g.transLock.Unlock()
-
-	if cond.Value != nil {
-		return cond.Value, nil
-	}
-
-	retriesLeft := 3
-
-	for retriesLeft > 0 {
-		err := g.SendCommand(cmd, g.configID)
-		if err != nil {
-			return nil, fmt.Errorf("send command: %w", err)
-		}
-
-		select {
-		case <-cond.NotifyChan():
-			time.Sleep(200 * time.Millisecond) // Wait for transmission to end
-			return cond.Value, nil
-
-		case <-time.After(3 * time.Second):
-			log.Warn().Msg("retrying")
-			retriesLeft--
-		}
-	}
-
-	return nil, errors.New("device did not respond")
-}
-
 func (g *Gamepad) GetConfig() (*config.AllConfigBean, error) {
-	return readCondRetry(g, CommandReadConfig, g.currConfig)
+	if g.currConfig.Value != nil {
+		return g.currConfig.Value, nil
+	}
+
+	err := g.prot.Send(protocol.CommandReadConfig{ConfigID: g.configID})
+	if err != nil {
+		return nil, fmt.Errorf("send command: %w", err)
+	}
+
+	<-g.currConfig.NotifyChan()
+	return g.currConfig.Value, nil
 }
 
 func (g *Gamepad) GetLEDConfig() (*config.NewLedConfigBean, error) {
-	return readCondRetry(g, CommandReadLEDConfig, g.currLEDConfig)
-}
+	if g.currLEDConfig.Value != nil {
+		return g.currLEDConfig.Value, nil
+	}
 
-func (g *Gamepad) SendCommand(cmd CommandNumber, args ...byte) error {
-	log.Debug().Int("cmd", int(cmd)).Bytes("args", args).Msg("sending command")
+	err := g.prot.Send(protocol.CommandReadLEDConfig{ConfigID: g.configID})
+	if err != nil {
+		return nil, fmt.Errorf("send command: %w", err)
+	}
 
-	buf := make([]byte, 12)
-	buf[0] = 5
-	buf[1] = byte(cmd)
-	copy(buf[2:], args)
-
-	_, err := g.dev.Write(buf)
-	return err
+	<-g.currLEDConfig.NotifyChan()
+	return g.currLEDConfig.Value, nil
 }

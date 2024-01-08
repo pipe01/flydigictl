@@ -17,3 +17,15 @@ type CommandReadLEDConfig struct {
 	cmd
 	ConfigID byte
 }
+
+type CommandSendConfig struct {
+	cmd
+	Data     []byte
+	ConfigID byte
+}
+
+type CommandSendLEDConfig struct {
+	cmd
+	Data     []byte
+	ConfigID byte
+}

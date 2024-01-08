@@ -1,27 +1,17 @@
 package protocol
 
-import "errors"
-
-var errUnknownMessage = errors.New("unknown message")
-
 type raw []byte
-
-func (m raw) Raw() []byte {
-	return m
-}
 
 func (raw) message() {}
 
 type MessageGamepadConfigReadCB struct {
 	raw
-	PackageIndex byte
-	Data         []byte
+	Data []byte
 }
 
 type MessageLEDConfigReadCB struct {
 	raw
-	PackageIndex byte
-	Data         []byte
+	Data []byte
 }
 
 type MessageDongleInfo struct {
