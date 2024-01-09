@@ -20,7 +20,7 @@
             "request": "launch",
             "mode": "auto",
             "program": "${workspaceFolder}/cmd/flydigictl",
-            "args": ["joystick", "right", "deadzone"]
+            "args": ["infoa"]
         }
     ]
 }

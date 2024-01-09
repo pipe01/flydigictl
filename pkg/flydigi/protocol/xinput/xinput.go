@@ -21,10 +21,10 @@ const (
 )
 
 const (
-	commandGetDongleVersion       = 17
-	commandReadConfig             = 33
-	commandGetDeviceInfoInAndroid = 16
-	commandReadLEDConfig          = 38
+	commandGetDongleVersion = 17
+	commandReadConfig       = 33
+	commandGetDeviceInfo    = 16
+	commandReadLEDConfig    = 38
 )
 
 type protocolXInput struct {
@@ -219,6 +219,9 @@ func (d *protocolXInput) Send(cmd protocol.Command) error {
 	switch cmd := cmd.(type) {
 	case protocol.CommandGetDongleVersion:
 		return d.sendCommand(commandGetDongleVersion)
+
+	case protocol.CommandGetDeviceInfo:
+		return d.sendCommand(commandGetDeviceInfo)
 
 	case protocol.CommandReadConfig:
 		d.configReader.Reset()

@@ -8,6 +8,10 @@ type CommandGetDongleVersion struct {
 	cmd
 }
 
+type CommandGetDeviceInfo struct {
+	cmd
+}
+
 type CommandReadConfig struct {
 	cmd
 	ConfigID byte

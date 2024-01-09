@@ -24,8 +24,9 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "flydigictl",
-	Short: "Control Flydigi gamepads",
+	Use:          "flydigictl",
+	Short:        "Control Flydigi gamepads",
+	SilenceUsage: true,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		if err := connectDBus(); err != nil {
 			log.Fatalf("failed to connect to dbus service: %s", err)
@@ -79,9 +80,21 @@ func disconnectGamepad() error {
 
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+}
+
+func useConnection(fn func() error) error {
+	if err := connectGamepad(); err != nil {
+		return fmt.Errorf("connect to gamepad: %w", err)
+	}
+	defer disconnectGamepad()
+
+	if err := fn(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func readConfiguration[T any](fn func(conf *pb.GamepadConfiguration) T) (ret T, err error) {

@@ -126,6 +126,32 @@ func (s *Server) SetConfiguration(data []byte) *dbus.Error {
 	return nil
 }
 
+func (s *Server) GetDeviceInfo() ([]byte, *dbus.Error) {
+	if err := s.checkConnected(); err != nil {
+		return nil, err
+	}
+
+	info, err := s.gp.GetGamepadInfo()
+	if err != nil {
+		return nil, makeError(common.ErrorGamepadWritingFault, err)
+	}
+
+	prot := pb.GamepadInfo{
+		DeviceId:       info.DeviceId,
+		BatteryPercent: info.BatteryPercent,
+		ConnectionType: pb.ConnectionType(info.ConnectType),
+		CpuType:        info.CpuType,
+		CpuName:        info.CpuName,
+	}
+
+	data, err := proto.Marshal(&prot)
+	if err != nil {
+		return nil, makeError(common.ErrorMarshallingFault, err)
+	}
+
+	return data, nil
+}
+
 func (s *Server) Listen() error {
 	log.Info().Msg("connecting to dbus")
 

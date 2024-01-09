@@ -476,3 +476,23 @@ func getLedGroupList(modeId, ledNum int) []*LedGroup {
 
 	return groups
 }
+
+var GameHandleName = map[int32]string{
+	19: "apex2",
+	20: "f1",
+	21: "f1",
+	22: "f1p",
+	23: "f1",
+	24: "k1",
+	25: "fp1",
+	26: "K1SF",
+	29: "k1",
+	27: "fp1",
+	30: "fp1Fate",
+	28: "f3",
+	80: "f3p",
+	81: "f3pip",
+	82: "fp2",
+	83: "fp2ip",
+	84: "k2",
+}

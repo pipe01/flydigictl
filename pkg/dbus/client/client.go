@@ -80,6 +80,22 @@ func (c *Client) SetConfiguration(cfg *pb.GamepadConfiguration) error {
 	return nil
 }
 
+func (c *Client) GetDeviceInfo() (*pb.GamepadInfo, error) {
+	var infoBytes []byte
+
+	if err := c.call("GetDeviceInfo", nil, &infoBytes); err != nil {
+		return nil, c.wrapError(err)
+	}
+
+	var info pb.GamepadInfo
+
+	if err := proto.Unmarshal(infoBytes, &info); err != nil {
+		return nil, fmt.Errorf("unmarshal info: %w", err)
+	}
+
+	return &info, nil
+}
+
 func (c *Client) wrapError(err error) error {
 	switch err := err.(type) {
 	case dbus.Error:

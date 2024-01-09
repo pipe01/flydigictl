@@ -106,6 +106,9 @@ func (d *protocolDInput) Send(cmd protocol.Command) error {
 	case protocol.CommandGetDongleVersion:
 		return d.sendCommand(commandGetDongleVersion)
 
+	case protocol.CommandGetDeviceInfo:
+		return d.sendCommand(commandGetDeviceInfoInAndroid)
+
 	case protocol.CommandReadConfig:
 		d.configReader.Reset()
 		return d.sendCommand(commandReadConfig, cmd.ConfigID)

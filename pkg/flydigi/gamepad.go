@@ -86,7 +86,7 @@ type commandCallbackFunc func(data []byte)
 type Gamepad struct {
 	prot protocol.Protocol
 
-	devInfo FDGDeviceInfo
+	devInfo *utils.CondValue[FDGDeviceInfo]
 
 	closech chan struct{}
 
@@ -112,6 +112,7 @@ func OpenGamepad() (*Gamepad, error) {
 	gamepad := &Gamepad{
 		prot:          prot,
 		closech:       make(chan struct{}),
+		devInfo:       utils.NewCondValue[FDGDeviceInfo](&sync.Mutex{}),
 		currConfig:    utils.NewCondValue[config.AllConfigBean](&sync.Mutex{}),
 		currLEDConfig: utils.NewCondValue[config.NewLedConfigBean](&sync.Mutex{}),
 	}
@@ -166,9 +167,9 @@ func (g *Gamepad) handleMessage(msg protocol.Message) error {
 func (g *Gamepad) handleDeviceInfo(msg protocol.MessageGamePadInfo) error {
 	log.Debug().Uint8("deviceid", msg.DeviceID).Msg("got device info")
 
-	g.devInfo = FDGDeviceInfo{}
+	devInfo := FDGDeviceInfo{}
 
-	g.devInfo.DeviceId = int32(msg.DeviceID)
+	devInfo.DeviceId = int32(msg.DeviceID)
 	// if (!GameHandleListDic.gameHandleDic.ContainsKey((int)deviceId))
 	// {
 	// 	return;
@@ -177,15 +178,15 @@ func (g *Gamepad) handleDeviceInfo(msg protocol.MessageGamePadInfo) error {
 	// currentDeviceInfo.GameHadleName = GameHandleListDic.gameHandleDic[(int)deviceId].GameHadleName;
 	// currentDeviceInfo.FirmwareName = GameHandleListDic.gameHandleDic[(int)deviceId].FirmwareName;
 
-	g.devInfo.DeviceMac = net.HardwareAddr(msg.DeviceMac).String()
+	devInfo.DeviceMac = net.HardwareAddr(msg.DeviceMac).String()
 
 	fw_l := msg.FW_L & 15
 	fw_l_2 := msg.FW_L >> 4
 	fw_h := msg.FW_H & 15
 	fw_h_2 := msg.FW_H >> 4
 
-	g.devInfo.FirmwareVersionCode = int32(fw_h_2)*1000 + int32(fw_h)*100 + int32(fw_l_2)*10 + int32(fw_l)
-	g.devInfo.FirmwareVersion = fmt.Sprintf("%d.%d.%d.%d", fw_h_2, fw_h, fw_l_2, fw_l)
+	devInfo.FirmwareVersionCode = int32(fw_h_2)*1000 + int32(fw_h)*100 + int32(fw_l_2)*10 + int32(fw_l)
+	devInfo.FirmwareVersion = fmt.Sprintf("%d.%d.%d.%d", fw_h_2, fw_h, fw_l_2, fw_l)
 
 	battery := msg.Battery
 	const apex2MinBY = 98
@@ -198,36 +199,37 @@ func (g *Gamepad) handleDeviceInfo(msg protocol.MessageGamePadInfo) error {
 	}
 
 	batteryPercent := int(100 * float32(battery-apex2MinBY) / float32(apex2MaxBY-apex2MinBY))
-	g.devInfo.BatteryPercent = int32(batteryPercent)
+	devInfo.BatteryPercent = int32(batteryPercent)
 
 	switch msg.MotionSensorType {
 	case 1:
-		g.devInfo.MotionSensorType = "ST"
+		devInfo.MotionSensorType = "ST"
 	case 2:
-		g.devInfo.MotionSensorType = "QST"
+		devInfo.MotionSensorType = "QST"
 	}
 
 	if msg.CPUType > 0 {
-		g.devInfo.CpuType = "wch"
+		devInfo.CpuType = "wch"
 	} else {
-		g.devInfo.CpuType = "nordic"
+		devInfo.CpuType = "nordic"
 	}
 
 	if fw_h_2 >= 6 && fw_h >= 1 {
-		g.devInfo.CpuType = "wch"
+		devInfo.CpuType = "wch"
 	}
 
-	if g.devInfo.CpuType == "wch" {
+	if devInfo.CpuType == "wch" {
 		if msg.ConnectionType == 1 {
-			g.devInfo.ConnectType = FDGConncetWired
-			g.devInfo.CpuName = "ch573"
+			devInfo.ConnectType = FDGConncetWired
+			devInfo.CpuName = "ch573"
 		} else {
-			g.devInfo.ConnectType = FDGConncetWireless
-			g.devInfo.CpuName = "ch571"
+			devInfo.ConnectType = FDGConncetWireless
+			devInfo.CpuName = "ch571"
 			g.prot.Send(protocol.CommandGetDongleVersion{})
 		}
 	}
 
+	devInfo.GameHadleName = config.GameHandleName[devInfo.DeviceId]
 	// currentDeviceInfo.GameHadleName = GameHandleListDic.gameHandleDic[currentDeviceInfo.DeviceId].GameHadleName;
 	// currentDeviceInfo.ShowGameHadleName = GameHandleListDic.gameHandleDic[currentDeviceInfo.DeviceId].ShowGameHadleName;
 	// currentDeviceInfo.FirmwareName = GameHandleListDic.gameHandleDic[currentDeviceInfo.DeviceId].FirmwareName;
@@ -242,25 +244,28 @@ func (g *Gamepad) handleDeviceInfo(msg protocol.MessageGamePadInfo) error {
 	// currentDeviceInfo.LcdFirmwareName = GameHandleListDic.gameHandleDic[currentDeviceInfo.DeviceId].LcdFirmwareName;
 	// currentDeviceInfo.TriggerFirmwareName = GameHandleListDic.gameHandleDic[currentDeviceInfo.DeviceId].TriggerFirmwareName;
 
-	switch g.devInfo.DeviceId {
+	switch devInfo.DeviceId {
 	case 19:
-		g.devInfo.FirmwareName = "apex2"
+		devInfo.FirmwareName = "apex2"
 
 	case 20, 21:
-		g.devInfo.FirmwareName = "f1"
-		if g.devInfo.CpuType == "wch" {
-			g.devInfo.FirmwareName = "f1wch"
+		devInfo.FirmwareName = "f1"
+		if devInfo.CpuType == "wch" {
+			devInfo.FirmwareName = "f1wch"
 		}
 
 	case 22, 23:
-		g.devInfo.FirmwareName = "f1p"
+		devInfo.FirmwareName = "f1p"
 
 	case 24:
-		g.devInfo.FirmwareName = "k1"
+		devInfo.FirmwareName = "k1"
 
 	case 25:
-		g.devInfo.FirmwareName = "fp1"
+		devInfo.FirmwareName = "fp1"
 	}
+
+	g.devInfo.Value = &devInfo
+	g.devInfo.Broadcast()
 
 	return nil
 }
@@ -271,11 +276,15 @@ func (g *Gamepad) handleDongleInfo(msg protocol.MessageDongleInfo) error {
 	fw_h := msg.FW_H & 15
 	fw_h_2 := msg.FW_H >> 4
 
+	if g.devInfo.Value == nil {
+		g.devInfo.Value = &FDGDeviceInfo{}
+	}
+
 	if fw_l+fw_l_2+fw_h+fw_h_2 > 0 {
-		g.devInfo.DongleVersion = fmt.Sprintf("%d.%d.%d.%d", fw_l_2, fw_l, fw_h_2, fw_h)
-		g.devInfo.ConnectType = FDGConncetWireless
+		g.devInfo.Value.DongleVersion = fmt.Sprintf("%d.%d.%d.%d", fw_l_2, fw_l, fw_h_2, fw_h)
+		g.devInfo.Value.ConnectType = FDGConncetWireless
 	} else {
-		g.devInfo.ConnectType = FDGConncetWired
+		g.devInfo.Value.ConnectType = FDGConncetWired
 	}
 
 	return nil
@@ -377,4 +386,8 @@ func (g *Gamepad) GetConfig() (*config.AllConfigBean, error) {
 
 func (g *Gamepad) GetLEDConfig() (*config.NewLedConfigBean, error) {
 	return getConfigRetry(g.prot, g.currLEDConfig, protocol.CommandReadLEDConfig{ConfigID: g.configID})
+}
+
+func (g *Gamepad) GetGamepadInfo() (*FDGDeviceInfo, error) {
+	return getConfigRetry(g.prot, g.devInfo, protocol.CommandGetDeviceInfo{})
 }

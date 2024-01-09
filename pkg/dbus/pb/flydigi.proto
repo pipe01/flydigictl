@@ -3,8 +3,18 @@ package flydigi;
 
 option go_package = "github.com/pipe01/flydigi-linux/pkg/dbus/pb";
 
+enum ConnectionType {
+    UNKNOWN = 0;
+    WIRELESS = 1;
+    WIRED = 2;
+}
+
 message GamepadInfo {
     int32 device_id = 1;
+    int32 battery_percent = 2;
+    ConnectionType connection_type = 3;
+    string cpu_type = 4;
+    string cpu_name = 5;
 }
 
 message GamepadConfiguration {
