@@ -20,7 +20,11 @@ deb-clean:
 
 deb: deb-clean bin-daemon bin-ctl
 	mkdir -p $(DEB_FULLNAME)/DEBIAN $(DEB_FULLNAME)/usr/bin $(DEB_FULLNAME)/etc/dbus-1/system.d \
-			$(DEB_FULLNAME)/usr/lib/systemd/system $(DEB_FULLNAME)/usr/share/dbus-1/system-services
+			$(DEB_FULLNAME)/usr/lib/systemd/system $(DEB_FULLNAME)/usr/share/dbus-1/system-services \
+			$(DEB_FULLNAME)/etc/bash_completion.d $(DEB_FULLNAME)/usr/share/fish/vendor_completions.d
+
+	./flydigictl completion bash > $(DEB_FULLNAME)/etc/bash_completion.d/flydigictl
+	./flydigictl completion fish > $(DEB_FULLNAME)/usr/share/fish/vendor_completions.d/flydigictl.fish
 
 	mv flydigid flydigictl $(DEB_FULLNAME)/usr/bin
 	cp $(SRC)/etc/flydigid.conf $(DEB_FULLNAME)/etc/dbus-1/system.d
@@ -48,6 +52,7 @@ install: bin-daemon bin-ctl
 	cp $(SRC)/etc/flydigid.service /usr/lib/systemd/system
 	cp $(SRC)/etc/com.pipe01.flydigi.Gamepad.service /usr/share/dbus-1/system-services
 	systemctl daemon-reload
+	flydigictl completion bash > /etc/bash_completion.d/flydigictl
 
 uninstall:
 	systemctl stop flydigid.service || true
@@ -55,4 +60,5 @@ uninstall:
 	rm -f /etc/dbus-1/system.d/flydigid.conf
 	rm -f /usr/lib/systemd/system/flydigid.service
 	rm -f /usr/share/dbus-1/system-services/com.pipe01.flydigi.Gamepad.service
+	rm -f /etc/bash_completion.d/flydigictl
 	systemctl daemon-reload
