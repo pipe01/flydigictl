@@ -22,7 +22,7 @@ jobs:
         go-version: '1.21'
 
     - name: Install dependencies
-      run: apt install libusb-1.0-0-dev
+      run: sudo apt install libusb-1.0-0-dev
 
     - name: Generate deb
       run: make deb
