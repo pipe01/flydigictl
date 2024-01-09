@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sync/atomic"
 	"time"
 
 	"github.com/pipe01/flydigi-linux/flydigi/protocol"
@@ -32,6 +33,7 @@ type protocolXInput struct {
 	out    io.Writer
 	closer io.Closer
 
+	isClosed       atomic.Bool
 	xpadWasEnabled bool
 
 	msgch chan protocol.Message
@@ -106,6 +108,10 @@ func Open() (protocol.Protocol, error) {
 }
 
 func (d *protocolXInput) Close() error {
+	if d.isClosed.Swap(true) {
+		return nil
+	}
+
 	err := d.closer.Close()
 	if d.xpadWasEnabled {
 		log.Debug().Msg("loading xpad module")
