@@ -38,3 +38,18 @@ deb: deb-clean bin-daemon bin-ctl
 	chmod 555 $(DEB_FULLNAME)/DEBIAN/postinst $(DEB_FULLNAME)/DEBIAN/prerm $(DEB_FULLNAME)/DEBIAN/postrm
 
 	dpkg-deb --build --root-owner-group $(DEB_FULLNAME)
+
+install: bin-daemon bin-ctl
+	mv flydigid flydigictl /usr/bin
+	cp $(SRC)/etc/flydigid.conf /etc/dbus-1/system.d
+	cp $(SRC)/etc/flydigid.service /usr/lib/systemd/system
+	cp $(SRC)/etc/com.pipe01.flydigi.Gamepad.service /usr/share/dbus-1/system-services
+	systemctl daemon-reload
+
+uninstall:
+	systemctl stop flydigid.service || true
+	rm -f /usr/bin/flydigid /usr/bin/flydigictl
+	rm -f /etc/dbus-1/system.d/flydigid.conf
+	rm -f /usr/lib/systemd/system/flydigid.service
+	rm -f /usr/share/dbus-1/system-services/com.pipe01.flydigi.Gamepad.service
+	systemctl daemon-reload
