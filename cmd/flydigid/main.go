@@ -23,9 +23,9 @@ func main() {
 
 	golog.SetOutput(io.Discard) // Supress github.com/google/gousb logging
 
-	server := server.New()
+	srv := server.New()
 
-	if err := server.Listen(); err != nil {
+	if err := srv.Listen(); err != nil {
 		log.Fatal().Err(err).Msg("failed to start dbus server")
 	}
 }
