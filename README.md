@@ -1,6 +1,6 @@
 # flydigictl
 
-A utility for managing the configuration of [Flydigi](https://en.flydigi.com/) controllers.
+A utility for managing the configuration of [Flydigi](https://en.flydigi.com/) controllers on Linux systems.
 
 Currently supported:
 
