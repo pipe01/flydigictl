@@ -5,8 +5,8 @@ import (
 	"io"
 	"time"
 
-	"github.com/pipe01/flydigi-linux/pkg/flydigi/protocol"
-	"github.com/pipe01/flydigi-linux/pkg/flydigi/protocol/internal"
+	"github.com/pipe01/flydigictl/pkg/flydigi/protocol"
+	"github.com/pipe01/flydigictl/pkg/flydigi/protocol/internal"
 
 	"github.com/karalabe/usb"
 	"github.com/rs/zerolog/log"

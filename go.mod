@@ -1,4 +1,4 @@
-module github.com/pipe01/flydigi-linux
+module github.com/pipe01/flydigictl
 
 go 1.21.5
 

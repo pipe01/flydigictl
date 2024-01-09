@@ -1,7 +1,7 @@
 syntax = "proto3";
 package flydigi;
 
-option go_package = "github.com/pipe01/flydigi-linux/pkg/dbus/pb";
+option go_package = "github.com/pipe01/flydigictl/pkg/dbus/pb";
 
 enum ConnectionType {
     UNKNOWN = 0;

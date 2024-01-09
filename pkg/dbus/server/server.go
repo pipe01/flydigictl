@@ -5,17 +5,17 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/pipe01/flydigi-linux/pkg/dbus/pb"
-	"github.com/pipe01/flydigi-linux/pkg/flydigi"
-	"github.com/pipe01/flydigi-linux/pkg/flydigi/protocol"
-	"github.com/pipe01/flydigi-linux/pkg/version"
+	"github.com/pipe01/flydigictl/pkg/dbus/pb"
+	"github.com/pipe01/flydigictl/pkg/flydigi"
+	"github.com/pipe01/flydigictl/pkg/flydigi/protocol"
+	"github.com/pipe01/flydigictl/pkg/version"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/godbus/dbus/v5"
 	"github.com/godbus/dbus/v5/introspect"
 	"github.com/rs/zerolog/log"
 
-	common "github.com/pipe01/flydigi-linux/pkg/dbus"
+	common "github.com/pipe01/flydigictl/pkg/dbus"
 )
 
 type Server struct {

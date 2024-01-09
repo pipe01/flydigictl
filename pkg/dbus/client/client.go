@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/godbus/dbus/v5"
-	common "github.com/pipe01/flydigi-linux/pkg/dbus"
-	"github.com/pipe01/flydigi-linux/pkg/dbus/pb"
+	common "github.com/pipe01/flydigictl/pkg/dbus"
+	"github.com/pipe01/flydigictl/pkg/dbus/pb"
 	"google.golang.org/protobuf/proto"
 )
 

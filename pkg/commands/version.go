@@ -3,7 +3,7 @@ package commands
 import (
 	"fmt"
 
-	"github.com/pipe01/flydigi-linux/pkg/version"
+	"github.com/pipe01/flydigictl/pkg/version"
 	"github.com/spf13/cobra"
 )
 

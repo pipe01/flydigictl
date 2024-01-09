@@ -7,9 +7,9 @@ import (
 	"os"
 
 	godbus "github.com/godbus/dbus/v5"
-	"github.com/pipe01/flydigi-linux/pkg/dbus"
-	"github.com/pipe01/flydigi-linux/pkg/dbus/client"
-	"github.com/pipe01/flydigi-linux/pkg/dbus/pb"
+	"github.com/pipe01/flydigictl/pkg/dbus"
+	"github.com/pipe01/flydigictl/pkg/dbus/client"
+	"github.com/pipe01/flydigictl/pkg/dbus/pb"
 	"github.com/spf13/cobra"
 )
 

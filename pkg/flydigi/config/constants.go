@@ -1,6 +1,6 @@
 package config
 
-import "github.com/pipe01/flydigi-linux/pkg/utils"
+import "github.com/pipe01/flydigictl/pkg/utils"
 
 var ledUnits = [][][][]byte{
 	{

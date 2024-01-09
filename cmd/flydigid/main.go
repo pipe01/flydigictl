@@ -5,7 +5,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/pipe01/flydigi-linux/pkg/dbus/server"
+	"github.com/pipe01/flydigictl/pkg/dbus/server"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"

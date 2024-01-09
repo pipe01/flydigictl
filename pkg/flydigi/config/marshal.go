@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/pipe01/flydigi-linux/pkg/utils"
+	"github.com/pipe01/flydigictl/pkg/utils"
 )
 
 func ConvertByteByGConfig(buf *bytes.Buffer, config *AllConfigBean) {

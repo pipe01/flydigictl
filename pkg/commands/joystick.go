@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/pipe01/flydigi-linux/pkg/dbus/pb"
+	"github.com/pipe01/flydigictl/pkg/dbus/pb"
 	"github.com/spf13/cobra"
 )
 

@@ -1,6 +1,6 @@
 package pb
 
-import "github.com/pipe01/flydigi-linux/pkg/flydigi/config"
+import "github.com/pipe01/flydigictl/pkg/flydigi/config"
 
 func GetGamepadConfiguration(bean *config.AllConfigBean) *GamepadConfiguration {
 	return &GamepadConfiguration{
