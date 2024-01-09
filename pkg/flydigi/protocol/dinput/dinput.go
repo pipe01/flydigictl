@@ -3,7 +3,6 @@ package dinput
 import (
 	"fmt"
 	"io"
-	"os"
 	"time"
 
 	"github.com/pipe01/flydigi-linux/pkg/flydigi/protocol"
@@ -46,7 +45,7 @@ func Open() (protocol.Protocol, error) {
 	}
 
 	if len(devs) == 0 {
-		return nil, os.ErrNotExist
+		return nil, protocol.ErrGamepadNotPresent
 	}
 
 	p := &protocolDInput{
@@ -71,7 +70,7 @@ func Open() (protocol.Protocol, error) {
 		}
 	}
 
-	return nil, os.ErrNotExist
+	return nil, protocol.ErrGamepadNotPresent
 }
 
 func (d *protocolDInput) Close() error {

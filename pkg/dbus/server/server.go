@@ -1,11 +1,13 @@
 package server
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 
 	"github.com/pipe01/flydigi-linux/pkg/dbus/pb"
 	"github.com/pipe01/flydigi-linux/pkg/flydigi"
+	"github.com/pipe01/flydigi-linux/pkg/flydigi/protocol"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/godbus/dbus/v5"
@@ -43,6 +45,10 @@ func (s *Server) Connect() *dbus.Error {
 
 	dev, err := flydigi.OpenGamepad()
 	if err != nil {
+		if errors.Is(err, protocol.ErrGamepadNotPresent) {
+			return makeError(common.ErrorGamepadNotFound, nil)
+		}
+
 		return dbus.MakeFailedError(err)
 	}
 

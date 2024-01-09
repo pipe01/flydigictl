@@ -1,11 +1,12 @@
 package commands
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"os"
 
-	common "github.com/pipe01/flydigi-linux/pkg/dbus"
+	"github.com/pipe01/flydigi-linux/pkg/dbus"
 	"github.com/pipe01/flydigi-linux/pkg/dbus/client"
 	"github.com/pipe01/flydigi-linux/pkg/dbus/pb"
 	"github.com/spf13/cobra"
@@ -16,7 +17,9 @@ var dbusClient *client.Client
 var (
 	weConnectedGamepad bool
 
-	terseOutput bool
+	terseOutput          bool
+	persistConnection    bool
+	forceCloseConnection bool
 )
 
 var rootCmd = &cobra.Command{
@@ -27,15 +30,12 @@ var rootCmd = &cobra.Command{
 			log.Fatalf("failed to connect to dbus service: %s", err)
 		}
 	},
-	PersistentPostRun: func(cmd *cobra.Command, args []string) {
-		if weConnectedGamepad {
-			dbusClient.Disconnect()
-		}
-	},
 }
 
 func init() {
 	rootCmd.PersistentFlags().BoolVarP(&terseOutput, "terse", "t", false, "Output only the queried value with no decoration")
+	rootCmd.PersistentFlags().BoolVar(&persistConnection, "persist-conn", false, "Don't close the connection to the gamepad after the command exits")
+	rootCmd.PersistentFlags().BoolVar(&forceCloseConnection, "force-close-conn", false, "Forcibly close the connection to the gamepad after the command exits")
 }
 
 func connectDBus() error {
@@ -51,7 +51,9 @@ func connectDBus() error {
 func connectGamepad() error {
 	err := dbusClient.Connect()
 	if err != nil {
-		if common.IsFlydigiErr(err, common.ErrorAlreadyConnected) {
+		var ferr client.FlydigiError
+
+		if errors.As(err, &ferr) && ferr.Name == dbus.ErrorAlreadyConnected {
 			return nil
 		}
 
@@ -59,6 +61,14 @@ func connectGamepad() error {
 	}
 
 	weConnectedGamepad = true
+	return nil
+}
+
+func disconnectGamepad() error {
+	if forceCloseConnection || (weConnectedGamepad && !persistConnection) {
+		return dbusClient.Disconnect()
+	}
+
 	return nil
 }
 
@@ -73,7 +83,7 @@ func readConfiguration[T any](fn func(conf *pb.GamepadConfiguration) T) (ret T, 
 	if err := connectGamepad(); err != nil {
 		return ret, fmt.Errorf("connect to gamepad: %w", err)
 	}
-	defer dbusClient.Disconnect()
+	defer disconnectGamepad()
 
 	cfg, err := dbusClient.GetConfiguration()
 	if err != nil {
@@ -87,7 +97,7 @@ func modifyConfiguration(fn func(conf *pb.GamepadConfiguration)) error {
 	if err := connectGamepad(); err != nil {
 		return fmt.Errorf("connect to gamepad: %w", err)
 	}
-	defer dbusClient.Disconnect()
+	defer disconnectGamepad()
 
 	cfg, err := dbusClient.GetConfiguration()
 	if err != nil {

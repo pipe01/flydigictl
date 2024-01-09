@@ -10,6 +10,7 @@ const (
 	ErrorMarshallingFault    = errorsPrefix + "MarshallingFailed"
 	ErrorGamepadWritingFault = errorsPrefix + "GamepadWritingFault"
 	ErrorGamepadReadingFault = errorsPrefix + "GamepadReadingFault"
+	ErrorGamepadNotFound     = errorsPrefix + "GamepadNotFound"
 )
 
 func IsFlydigiErr(err error, errName string) bool {

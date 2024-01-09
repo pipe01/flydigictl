@@ -3,7 +3,6 @@ package xinput
 import (
 	"fmt"
 	"io"
-	"os"
 	"sync/atomic"
 	"time"
 
@@ -58,7 +57,7 @@ func Open() (protocol.Protocol, error) {
 	log.Debug().Int("count", len(devs)).Msg("found xinput usb devices")
 
 	if len(devs) == 0 {
-		return nil, os.ErrNotExist
+		return nil, protocol.ErrGamepadNotPresent
 	}
 
 	dev := devs[0]

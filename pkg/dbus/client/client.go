@@ -1,7 +1,6 @@
 package client
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/godbus/dbus/v5"
@@ -9,6 +8,15 @@ import (
 	"github.com/pipe01/flydigi-linux/pkg/dbus/pb"
 	"google.golang.org/protobuf/proto"
 )
+
+type FlydigiError struct {
+	Name    string
+	Message string
+}
+
+func (e FlydigiError) Error() string {
+	return e.Message
+}
 
 type Client struct {
 	conn *dbus.Conn
@@ -88,11 +96,13 @@ func (c *Client) wrapError(err error) error {
 			msg = "writing to gamepad failed"
 		case common.ErrorGamepadReadingFault:
 			msg = "reading from gamepad failed"
+		case common.ErrorGamepadNotFound:
+			msg = "gamepad not found"
 		default:
-			msg = err.Error()
+			return err
 		}
 
-		return errors.New(msg)
+		return FlydigiError{Name: err.Name, Message: msg}
 	}
 
 	return err

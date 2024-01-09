@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"os"
 	"sync"
 	"time"
 
@@ -100,7 +99,7 @@ type Gamepad struct {
 func OpenGamepad() (*Gamepad, error) {
 	prot, err := dinput.Open()
 	if err != nil {
-		if err != os.ErrNotExist {
+		if err != protocol.ErrGamepadNotPresent {
 			return nil, fmt.Errorf("open dinput device: %w", err)
 		}
 
