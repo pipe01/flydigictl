@@ -21,7 +21,7 @@ Probably won't work:
 ## Installing
 ### Debian, Ubuntu and other Debian-based distros
 
-You can download the artifact from the [latest actions run](https://github.com/pipe01/flydigictl/actions) and install it.
+You can download the artifact from the [latest actions run](https://github.com/pipe01/flydigictl/actions) and install the deb package.
 
 ### Other distros
 
