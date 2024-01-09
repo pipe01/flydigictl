@@ -3,9 +3,10 @@ package config
 import (
 	"bytes"
 	"encoding/binary"
-	"flydigi-linux/utils"
 	"strconv"
 	"strings"
+
+	"github.com/pipe01/flydigi-linux/utils"
 )
 
 func ConvertByteByGConfig(buf *bytes.Buffer, config *AllConfigBean) {

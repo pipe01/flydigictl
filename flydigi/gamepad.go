@@ -3,16 +3,17 @@ package flydigi
 import (
 	"bytes"
 	"errors"
-	"flydigi-linux/flydigi/config"
-	"flydigi-linux/flydigi/protocol"
-	"flydigi-linux/flydigi/protocol/dinput"
-	"flydigi-linux/flydigi/protocol/xinput"
-	"flydigi-linux/utils"
 	"fmt"
 	"net"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/pipe01/flydigi-linux/flydigi/config"
+	"github.com/pipe01/flydigi-linux/flydigi/protocol"
+	"github.com/pipe01/flydigi-linux/flydigi/protocol/dinput"
+	"github.com/pipe01/flydigi-linux/flydigi/protocol/xinput"
+	"github.com/pipe01/flydigi-linux/utils"
 
 	"github.com/rs/zerolog/log"
 )

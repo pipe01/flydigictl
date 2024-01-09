@@ -1,12 +1,13 @@
 package dinput
 
 import (
-	"flydigi-linux/flydigi/protocol"
-	"flydigi-linux/flydigi/protocol/internal"
 	"fmt"
 	"io"
 	"os"
 	"time"
+
+	"github.com/pipe01/flydigi-linux/flydigi/protocol"
+	"github.com/pipe01/flydigi-linux/flydigi/protocol/internal"
 
 	"github.com/karalabe/usb"
 	"github.com/rs/zerolog/log"

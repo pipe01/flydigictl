@@ -1,11 +1,12 @@
 package main
 
 import (
-	"flydigi-linux/dbus"
-	"flydigi-linux/flydigi"
-	"flydigi-linux/flydigi/config"
 	"io"
 	"os"
+
+	"github.com/pipe01/flydigi-linux/dbus"
+	"github.com/pipe01/flydigi-linux/flydigi"
+	"github.com/pipe01/flydigi-linux/flydigi/config"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"

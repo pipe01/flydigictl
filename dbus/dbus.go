@@ -1,9 +1,10 @@
 package dbus
 
 import (
-	"flydigi-linux/flydigi"
 	"fmt"
 	"sync"
+
+	"github.com/pipe01/flydigi-linux/flydigi"
 
 	"github.com/godbus/dbus/v5"
 	"github.com/godbus/dbus/v5/introspect"

@@ -2,8 +2,9 @@ package dinput
 
 import (
 	"bytes"
-	"flydigi-linux/utils"
 	"math"
+
+	"github.com/pipe01/flydigi-linux/utils"
 )
 
 const maxParcelLength = 10

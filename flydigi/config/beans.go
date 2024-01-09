@@ -1,6 +1,6 @@
 package config
 
-import "flydigi-linux/utils"
+import "github.com/pipe01/flydigi-linux/utils"
 
 type AllConfigBean struct {
 	Version        string
