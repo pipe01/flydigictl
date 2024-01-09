@@ -15,11 +15,6 @@ import (
 	common "github.com/pipe01/flydigi-linux/pkg/dbus"
 )
 
-const (
-	interfaceName = "com.pipe01.flydigi.Gamepad"
-	objectPath    = "/com/pipe01/flydigi/Gamepad"
-)
-
 type Server struct {
 	connectmu sync.Mutex
 
@@ -137,7 +132,7 @@ func (s *Server) Listen() error {
 	intros := introspect.NewIntrospectable(&introspect.Node{
 		Interfaces: []introspect.Interface{
 			{
-				Name: interfaceName,
+				Name: common.InterfaceName,
 				Methods: []introspect.Method{
 					{
 						Name: "Connect",
@@ -162,10 +157,10 @@ func (s *Server) Listen() error {
 		},
 	})
 
-	err = conn.Export(s, objectPath, interfaceName)
-	conn.Export(intros, objectPath, "org.freedesktop.DBus.Introspectable")
+	err = conn.Export(s, common.ObjectPath, common.InterfaceName)
+	conn.Export(intros, common.ObjectPath, "org.freedesktop.DBus.Introspectable")
 
-	reply, err := conn.RequestName(interfaceName, dbus.NameFlagDoNotQueue)
+	reply, err := conn.RequestName(common.InterfaceName, dbus.NameFlagDoNotQueue)
 	if err != nil {
 		return fmt.Errorf("request dbus name: %w", err)
 	}

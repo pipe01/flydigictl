@@ -324,6 +324,8 @@ func (g *Gamepad) SaveConfig(cfg *config.AllConfigBean) error {
 		return fmt.Errorf("send config: %w", err)
 	}
 
+	g.currConfig.Value = nil
+
 	buf.Reset()
 
 	if cfg.Basic.NewLedConfig != nil {
@@ -337,6 +339,8 @@ func (g *Gamepad) SaveConfig(cfg *config.AllConfigBean) error {
 		}); err != nil {
 			return fmt.Errorf("send config: %w", err)
 		}
+
+		g.currLEDConfig.Value = nil
 	}
 
 	return nil
