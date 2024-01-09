@@ -38,6 +38,7 @@ deb: deb-clean bin-daemon bin-ctl
 	chmod 555 $(DEB_FULLNAME)/DEBIAN/postinst $(DEB_FULLNAME)/DEBIAN/prerm $(DEB_FULLNAME)/DEBIAN/postrm
 
 	dpkg-deb --build --root-owner-group $(DEB_FULLNAME)
+	rm -rf $(DEB_FULLNAME)
 
 install: bin-daemon bin-ctl
 	mv flydigid flydigictl /usr/bin
