@@ -1,0 +1,17 @@
+syntax = "proto3";
+package flydigi;
+
+option go_package = "github.com/pipe01/flydigi-linux/dbus/pb";
+
+message GamepadInfo {
+    int32 device_id = 1;
+}
+
+message GamepadConfiguration {
+    JoystickConfiguration left_joystick = 1;
+    JoystickConfiguration right_joystick = 2;
+}
+
+message JoystickConfiguration {
+    int32 deadzone = 1;
+}

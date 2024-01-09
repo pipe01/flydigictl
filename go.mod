@@ -10,7 +10,10 @@ require (
 	pault.ag/go/modprobe v0.1.2
 )
 
-require pault.ag/go/topsort v0.0.0-20160530003732-f98d2ad46e1a // indirect
+require (
+	google.golang.org/protobuf v1.32.0 // indirect
+	pault.ag/go/topsort v0.0.0-20160530003732-f98d2ad46e1a // indirect
+)
 
 require (
 	github.com/mattn/go-colorable v0.1.13 // indirect
