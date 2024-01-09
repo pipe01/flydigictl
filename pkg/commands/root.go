@@ -35,9 +35,9 @@ var rootCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.PersistentFlags().BoolVarP(&terseOutput, "terse", "t", false, "Output only the queried value with no decoration")
-	rootCmd.PersistentFlags().BoolVar(&persistConnection, "persist-conn", false, "Don't close the connection to the gamepad after the command exits")
-	rootCmd.PersistentFlags().BoolVar(&forceCloseConnection, "force-close-conn", false, "Forcibly close the connection to the gamepad after the command exits")
+	rootCmd.PersistentFlags().BoolVarP(&terseOutput, "terse", "t", false, "output only the queried value with no decoration")
+	rootCmd.PersistentFlags().BoolVar(&persistConnection, "persist-conn", false, "don't close the connection to the gamepad after the command exits")
+	rootCmd.PersistentFlags().BoolVar(&forceCloseConnection, "close-conn", false, "always close the connection to the gamepad after the command exits")
 }
 
 func connectDBus() error {

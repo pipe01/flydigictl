@@ -12,7 +12,7 @@ var versionCommand = &cobra.Command{
 	Short: "Shows version information for flydigictl and flydigid",
 	Run: func(cmd *cobra.Command, args []string) {
 		if terseOutput {
-			println(version.Version)
+			fmt.Println(version.Version)
 		} else {
 			fmt.Printf("flydigictl version %s\n", version.Version)
 		}
