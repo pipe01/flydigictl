@@ -11,6 +11,8 @@ import (
 	"github.com/godbus/dbus/v5"
 	"github.com/godbus/dbus/v5/introspect"
 	"github.com/rs/zerolog/log"
+
+	common "github.com/pipe01/flydigi-linux/pkg/dbus"
 )
 
 const (
@@ -30,7 +32,7 @@ func New() *Server {
 
 func (s *Server) checkConnected() *dbus.Error {
 	if s.gp == nil {
-		return dbus.NewError("org.pipe01.flydigi.Error.NotConnected", nil)
+		return makeError(common.ErrorNotConnected, nil)
 	}
 
 	return nil
@@ -41,7 +43,7 @@ func (s *Server) Connect() *dbus.Error {
 	defer s.connectmu.Unlock()
 
 	if s.gp != nil {
-		return dbus.NewError("com.pipe01.flydigi.Error.AlreadyConnected", nil)
+		return makeError(common.ErrorAlreadyConnected, nil)
 	}
 
 	dev, err := flydigi.OpenGamepad()
@@ -83,14 +85,14 @@ func (s *Server) GetConfiguration() ([]byte, *dbus.Error) {
 
 	conf, err := s.gp.GetConfig()
 	if err != nil {
-		return nil, dbus.MakeFailedError(fmt.Errorf("get gamepad conf: %w", err))
+		return nil, makeError(common.ErrorGamepadReadingFault, err)
 	}
 
 	prot := pb.GetGamepadConfiguration(conf)
 
 	data, err := proto.Marshal(prot)
 	if err != nil {
-		return nil, dbus.MakeFailedError(fmt.Errorf("marshal conf: %w", err))
+		return nil, makeError(common.ErrorMarshallingFault, err)
 	}
 
 	return data, nil
@@ -105,19 +107,19 @@ func (s *Server) SetConfiguration(data []byte) *dbus.Error {
 
 	err := proto.Unmarshal(data, &conf)
 	if err != nil {
-		return dbus.MakeFailedError(fmt.Errorf("unmarshal conf: %w", err))
+		return makeError(common.ErrorMarshallingFault, err)
 	}
 
 	gpConf, err := s.gp.GetConfig()
 	if err != nil {
-		return dbus.MakeFailedError(fmt.Errorf("get gamepad conf: %w", err))
+		return makeError(common.ErrorGamepadReadingFault, err)
 	}
 
 	conf.ApplyTo(gpConf)
 
 	err = s.gp.SaveConfig(gpConf)
 	if err != nil {
-		return dbus.MakeFailedError(fmt.Errorf("save gamepad conf: %w", err))
+		return makeError(common.ErrorGamepadWritingFault, err)
 	}
 
 	return nil
@@ -172,4 +174,12 @@ func (s *Server) Listen() error {
 	}
 
 	select {}
+}
+
+func makeError(name string, err error) *dbus.Error {
+	var errstr string
+	if err != nil {
+		errstr = err.Error()
+	}
+	return dbus.NewError(name, []interface{}{errstr})
 }
