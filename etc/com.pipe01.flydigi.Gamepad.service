@@ -1,0 +1,4 @@
+[D-BUS Service]
+Name=com.pipe01.flydigi.Gamepad
+Exec=/bin/false
+SystemdService=flydigid.service
