@@ -3,11 +3,13 @@ DEB_VERSION = 0.0.1
 DEB_REVISION = 1
 DEB_ARCH = amd64
 
+GIT_COMMIT = $(shell git rev-parse --short HEAD)
+
 DEB_FULLNAME = $(DEB_NAME)_$(DEB_VERSION)-$(DEB_REVISION)_$(DEB_ARCH)
 
 SRC := .
 
-GO_FLAGS = -ldflags "-X 'github.com/pipe01/flydigictl/pkg/version.Version=$(DEB_VERSION)'"
+GO_FLAGS = -ldflags "-X 'github.com/pipe01/flydigictl/pkg/version.Version=$(DEB_VERSION)-$(GIT_COMMIT)'"
 
 bin-daemon:
 	go build $(GO_FLAGS) $(SRC)/cmd/flydigid
