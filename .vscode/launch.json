@@ -10,6 +10,7 @@
             "request": "launch",
             "mode": "auto",
             "program": "${workspaceFolder}/cmd/flydigid",
+            "args": ["-pretty-logs"],
             "asRoot": true,
             "console": "integratedTerminal"
         }

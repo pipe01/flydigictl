@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"io"
 	"os"
 
@@ -13,7 +14,12 @@ import (
 )
 
 func main() {
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+	prettyLogging := flag.Bool("pretty-logs", false, "Enable human-readable colored logs")
+	flag.Parse()
+
+	if *prettyLogging {
+		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+	}
 
 	golog.SetOutput(io.Discard) // Supress github.com/google/gousb logging
 
