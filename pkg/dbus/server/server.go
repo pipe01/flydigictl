@@ -1,11 +1,11 @@
-package dbus
+package server
 
 import (
 	"fmt"
 	"sync"
 
-	"github.com/pipe01/flydigi-linux/dbus/pb"
-	"github.com/pipe01/flydigi-linux/flydigi"
+	"github.com/pipe01/flydigi-linux/pkg/dbus/pb"
+	"github.com/pipe01/flydigi-linux/pkg/flydigi"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/godbus/dbus/v5"
@@ -24,7 +24,7 @@ type Server struct {
 	gp *flydigi.Gamepad
 }
 
-func NewServer() *Server {
+func New() *Server {
 	return &Server{}
 }
 

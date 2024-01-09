@@ -7,9 +7,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/pipe01/flydigi-linux/flydigi/protocol"
-	"github.com/pipe01/flydigi-linux/flydigi/protocol/internal"
-	"github.com/pipe01/flydigi-linux/utils"
+	"github.com/pipe01/flydigi-linux/pkg/flydigi/protocol"
+	"github.com/pipe01/flydigi-linux/pkg/flydigi/protocol/internal"
+	"github.com/pipe01/flydigi-linux/pkg/utils"
 
 	"github.com/google/gousb"
 	"github.com/rs/zerolog/log"

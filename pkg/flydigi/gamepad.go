@@ -9,11 +9,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pipe01/flydigi-linux/flydigi/config"
-	"github.com/pipe01/flydigi-linux/flydigi/protocol"
-	"github.com/pipe01/flydigi-linux/flydigi/protocol/dinput"
-	"github.com/pipe01/flydigi-linux/flydigi/protocol/xinput"
-	"github.com/pipe01/flydigi-linux/utils"
+	"github.com/pipe01/flydigi-linux/pkg/flydigi/config"
+	"github.com/pipe01/flydigi-linux/pkg/flydigi/protocol"
+	"github.com/pipe01/flydigi-linux/pkg/flydigi/protocol/dinput"
+	"github.com/pipe01/flydigi-linux/pkg/flydigi/protocol/xinput"
+	"github.com/pipe01/flydigi-linux/pkg/utils"
 
 	"github.com/rs/zerolog/log"
 )

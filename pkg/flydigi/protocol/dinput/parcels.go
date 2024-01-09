@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"math"
 
-	"github.com/pipe01/flydigi-linux/utils"
+	"github.com/pipe01/flydigi-linux/pkg/utils"
 )
 
 const maxParcelLength = 10
