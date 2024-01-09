@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/gousb"
 	"github.com/rs/zerolog/log"
+	"pault.ag/go/modprobe"
 )
 
 const (
@@ -29,6 +30,8 @@ type protocolXInput struct {
 	in     io.Reader
 	out    io.Writer
 	closer io.Closer
+
+	xpadWasEnabled bool
 
 	msgch chan protocol.Message
 
@@ -64,6 +67,12 @@ func Open() (protocol.Protocol, error) {
 	}
 	closers.AddCloser(cfg)
 
+	err = modprobe.Remove("xpad")
+	xpadWasEnabled := err == nil
+	if xpadWasEnabled {
+		log.Debug().Msg("unloaded xpad module")
+	}
+
 	intf, err := cfg.Interface(0, 0)
 	if err != nil {
 		return nil, fmt.Errorf("open interface: %w", err)
@@ -84,6 +93,7 @@ func Open() (protocol.Protocol, error) {
 		in:              inep,
 		out:             outep,
 		closer:          &closers,
+		xpadWasEnabled:  xpadWasEnabled,
 		msgch:           make(chan protocol.Message, 10),
 		configReader:    internal.NewConfigReader(packageLength, 10),
 		ledConfigReader: internal.NewConfigReader(ledPackageLength, 10),
@@ -96,7 +106,15 @@ func Open() (protocol.Protocol, error) {
 
 func (d *protocolXInput) Close() error {
 	err := d.closer.Close()
-	close(d.msgch)
+	if d.xpadWasEnabled {
+		log.Debug().Msg("loading xpad module")
+
+		err = modprobe.Load("xpad", "")
+		if err != nil {
+			log.Err(err).Msg("failed to load xpad module")
+		}
+	}
+
 	return err
 }
 
@@ -107,9 +125,15 @@ func (d *protocolXInput) Messages() <-chan protocol.Message {
 func (d *protocolXInput) readLoop() {
 	buf := make([]byte, 100)
 
+	defer close(d.msgch)
+
 	for {
 		n, err := d.in.Read(buf)
 		if err != nil {
+			if status, ok := err.(gousb.TransferStatus); !ok || status != gousb.TransferNoDevice {
+				log.Err(err).Msg("failed to read data from usb")
+			}
+
 			break
 		}
 

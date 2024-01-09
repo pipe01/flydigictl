@@ -88,6 +88,8 @@ type Gamepad struct {
 
 	devInfo FDGDeviceInfo
 
+	closech chan struct{}
+
 	currConfig    *utils.CondValue[config.AllConfigBean]
 	currLEDConfig *utils.CondValue[config.NewLedConfigBean]
 
@@ -109,6 +111,7 @@ func OpenGamepad() (*Gamepad, error) {
 
 	gamepad := &Gamepad{
 		prot:          prot,
+		closech:       make(chan struct{}),
 		currConfig:    utils.NewCondValue[config.AllConfigBean](&sync.Mutex{}),
 		currLEDConfig: utils.NewCondValue[config.NewLedConfigBean](&sync.Mutex{}),
 	}
@@ -122,11 +125,23 @@ func (g *Gamepad) Close() error {
 }
 
 func (g *Gamepad) readLoop() {
+	defer close(g.closech)
+	defer g.prot.Close()
+
 	for msg := range g.prot.Messages() {
 		if err := g.handleMessage(msg); err != nil {
 			log.Err(err).Msg("failed to handle usb data")
 		}
 	}
+
+	log.Debug().Msg("gamepad read loop exited")
+}
+
+func (g *Gamepad) NotifyClose(ch chan<- struct{}) {
+	go func() {
+		<-g.closech
+		ch <- struct{}{}
+	}()
 }
 
 func (g *Gamepad) handleMessage(msg protocol.Message) error {

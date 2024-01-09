@@ -9,6 +9,7 @@ require (
 )
 
 require (
+	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/google/gousb v1.1.2 // indirect
 	github.com/gookit/color v1.5.4 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect

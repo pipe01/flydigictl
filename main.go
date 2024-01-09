@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flydigi-linux/dbus"
 	"flydigi-linux/flydigi"
 	"flydigi-linux/flydigi/config"
 	"io"
@@ -8,8 +9,6 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-
-	"pault.ag/go/modprobe"
 
 	golog "log"
 )
@@ -19,19 +18,8 @@ func main() {
 
 	golog.SetOutput(io.Discard) // Supress github.com/google/gousb logging
 
-	err := modprobe.Remove("xpad")
-	if err == nil {
-		log.Info().Msg("unloaded xpad module")
-
-		defer func() {
-			log.Info().Msg("loading xpad module")
-
-			err = modprobe.Load("xpad", "")
-			if err != nil {
-				log.Err(err).Msg("failed to load xpad module")
-			}
-		}()
-	}
+	server := dbus.NewServer()
+	server.Listen()
 
 	dev, err := flydigi.OpenGamepad()
 	if err != nil {

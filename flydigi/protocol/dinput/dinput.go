@@ -74,9 +74,7 @@ func Open() (protocol.Protocol, error) {
 }
 
 func (d *protocolDInput) Close() error {
-	err := d.rw.Close()
-	close(d.msgch)
-	return err
+	return d.rw.Close()
 }
 
 func (d *protocolDInput) Messages() <-chan protocol.Message {
@@ -85,6 +83,8 @@ func (d *protocolDInput) Messages() <-chan protocol.Message {
 
 func (d *protocolDInput) readLoop() {
 	buf := make([]byte, 32)
+
+	defer close(d.msgch)
 
 	for {
 		n, err := d.rw.Read(buf)

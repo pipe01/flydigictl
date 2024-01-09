@@ -23,8 +23,8 @@ func (m *MultiCloser) AddFunc(fn func()) {
 func (m *MultiCloser) Close() error {
 	var errs []error
 
-	for _, c := range m.cls {
-		if err := c(); err != nil {
+	for i := range m.cls {
+		if err := m.cls[len(m.cls)-1-i](); err != nil {
 			errs = append(errs, err)
 		}
 	}
