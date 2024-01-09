@@ -7,11 +7,13 @@ DEB_FULLNAME = $(DEB_NAME)_$(DEB_VERSION)-$(DEB_REVISION)_$(DEB_ARCH)
 
 SRC := .
 
+GO_FLAGS = -ldflags "-X 'github.com/pipe01/flydigi-linux/pkg/version.Version=$(DEB_VERSION)'"
+
 bin-daemon:
-	go build $(SRC)/cmd/flydigid
+	go build $(GO_FLAGS) $(SRC)/cmd/flydigid
 
 bin-ctl:
-	go build $(SRC)/cmd/flydigictl
+	go build $(GO_FLAGS) $(SRC)/cmd/flydigictl
 
 deb-clean:
 	rm -rf $(DEB_FULLNAME)

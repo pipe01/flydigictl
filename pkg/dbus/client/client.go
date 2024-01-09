@@ -51,6 +51,16 @@ func (c *Client) Disconnect() error {
 	return c.wrapError(c.call("Disconnect", nil))
 }
 
+func (c *Client) GetServerVersion() (string, error) {
+	var version string
+
+	if err := c.call("GetServerVersion", nil, &version); err != nil {
+		return "", err
+	}
+
+	return version, nil
+}
+
 func (c *Client) GetConfiguration() (*pb.GamepadConfiguration, error) {
 	var cfgBytes []byte
 

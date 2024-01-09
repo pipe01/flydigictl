@@ -8,6 +8,7 @@ import (
 	"github.com/pipe01/flydigi-linux/pkg/dbus/pb"
 	"github.com/pipe01/flydigi-linux/pkg/flydigi"
 	"github.com/pipe01/flydigi-linux/pkg/flydigi/protocol"
+	"github.com/pipe01/flydigi-linux/pkg/version"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/godbus/dbus/v5"
@@ -77,6 +78,10 @@ func (s *Server) Disconnect() *dbus.Error {
 	}
 
 	return nil
+}
+
+func (s *Server) GetServerVersion() (string, *dbus.Error) {
+	return version.Version, nil
 }
 
 func (s *Server) GetConfiguration() ([]byte, *dbus.Error) {
@@ -153,8 +158,6 @@ func (s *Server) GetDeviceInfo() ([]byte, *dbus.Error) {
 }
 
 func (s *Server) Listen() error {
-	log.Info().Msg("connecting to dbus")
-
 	conn, err := dbus.ConnectSystemBus()
 	if err != nil {
 		return fmt.Errorf("connect to system bus: %w", err)
@@ -171,6 +174,12 @@ func (s *Server) Listen() error {
 					},
 					{
 						Name: "Disconnect",
+					},
+					{
+						Name: "GetServerVersion",
+						Args: []introspect.Arg{
+							{Direction: "out", Type: "s"},
+						},
 					},
 					{
 						Name: "GetConfiguration",
@@ -200,6 +209,7 @@ func (s *Server) Listen() error {
 		return fmt.Errorf("dbus name already taken")
 	}
 
+	log.Info().Msg("connected to dbus")
 	select {}
 }
 
