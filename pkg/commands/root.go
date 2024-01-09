@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 
+	godbus "github.com/godbus/dbus/v5"
 	"github.com/pipe01/flydigi-linux/pkg/dbus"
 	"github.com/pipe01/flydigi-linux/pkg/dbus/client"
 	"github.com/pipe01/flydigi-linux/pkg/dbus/pb"
@@ -52,9 +53,13 @@ func connectGamepad() error {
 	err := dbusClient.Connect()
 	if err != nil {
 		var ferr client.FlydigiError
-
 		if errors.As(err, &ferr) && ferr.Name == dbus.ErrorAlreadyConnected {
 			return nil
+		}
+
+		var dberr godbus.Error
+		if errors.As(err, &dberr) && dberr.Name == "org.freedesktop.DBus.Error.ServiceUnknown" {
+			return errors.New("flydigid is not running")
 		}
 
 		return err
