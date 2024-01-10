@@ -87,9 +87,10 @@ func (b *NewLedConfigBean) SetSteady(color LedUnit) {
 	}
 }
 
-func (b *NewLedConfigBean) SetStreamlined() {
+func (b *NewLedConfigBean) SetStreamlined(speed float32) {
 	b.LedMode = LedModeStreamlined
 	b.Loop_End = 5
+	b.Loop_time = 100 - byte(speed*100)
 	b.Rgb_num = 5
 	b.LedGroups = getLedGroupList(0, 5)
 }

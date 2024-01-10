@@ -337,19 +337,28 @@ func (g *Gamepad) SaveConfig(cfg *config.AllConfigBean) error {
 	buf.Reset()
 
 	if cfg.Basic.NewLedConfig != nil {
-		config.ConvertByteByNewLedConfig(&buf, cfg.Basic.NewLedConfig)
-
-		log.Info().Int("length", buf.Len()).Msg("saving led configuration")
-
-		if err := g.prot.Send(protocol.CommandSendLEDConfig{
-			Data:     buf.Bytes(),
-			ConfigID: g.configID,
-		}); err != nil {
-			return fmt.Errorf("send config: %w", err)
+		if err := g.SaveLEDConfig(cfg.Basic.NewLedConfig); err != nil {
+			return fmt.Errorf("save led config: %w", err)
 		}
-
-		g.currLEDConfig.Value = nil
 	}
+
+	return nil
+}
+
+func (g *Gamepad) SaveLEDConfig(cfg *config.NewLedConfigBean) error {
+	var buf bytes.Buffer
+	config.ConvertByteByNewLedConfig(&buf, cfg)
+
+	log.Info().Int("length", buf.Len()).Msg("saving led configuration")
+
+	if err := g.prot.Send(protocol.CommandSendLEDConfig{
+		Data:     buf.Bytes(),
+		ConfigID: g.configID,
+	}); err != nil {
+		return fmt.Errorf("send config: %w", err)
+	}
+
+	g.currLEDConfig.Value = nil
 
 	return nil
 }

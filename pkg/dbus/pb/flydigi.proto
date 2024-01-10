@@ -25,3 +25,27 @@ message GamepadConfiguration {
 message JoystickConfiguration {
     int32 deadzone = 1;
 }
+
+message LedsOff {
+}
+
+message LedsSteady {
+    Color color = 1;
+}
+
+message LedsStreamlined {
+    float speed = 1;
+}
+
+message LedsConfiguration {
+    float brightness = 1;
+    oneof leds {
+        LedsOff off = 10;
+        LedsSteady steady = 12;
+        LedsStreamlined streamlined = 13;
+    }
+}
+
+message Color {
+    int32 rgb = 1;
+}

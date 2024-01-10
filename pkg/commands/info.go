@@ -30,6 +30,7 @@ var gamepadNames = map[int32]string{
 var infoCommand = &cobra.Command{
 	Use:   "info",
 	Short: "Get information about the connected gamepad",
+	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return useConnection(func() error {
 			info, err := dbusClient.GetDeviceInfo()

@@ -3,6 +3,7 @@ package server
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/pipe01/flydigictl/pkg/dbus/pb"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/godbus/dbus/v5"
 	"github.com/godbus/dbus/v5/introspect"
+	"github.com/gookit/goutil/dump"
 	"github.com/rs/zerolog/log"
 
 	common "github.com/pipe01/flydigictl/pkg/dbus"
@@ -84,6 +86,28 @@ func (s *Server) GetServerVersion() (string, *dbus.Error) {
 	return version.Version, nil
 }
 
+func (s *Server) DumpConfiguration() (string, *dbus.Error) {
+	if err := s.checkConnected(); err != nil {
+		return "", err
+	}
+
+	conf, err := s.gp.GetConfig()
+	if err != nil {
+		return "", makeError(common.ErrorGamepadReadingFault, err)
+	}
+
+	conf.Basic.NewLedConfig, err = s.gp.GetLEDConfig()
+	if err != nil {
+		return "", makeError(common.ErrorGamepadReadingFault, err)
+	}
+
+	var str strings.Builder
+
+	dump.NewDumper(&str, 0).Dump(conf)
+
+	return str.String(), nil
+}
+
 func (s *Server) GetConfiguration() ([]byte, *dbus.Error) {
 	if err := s.checkConnected(); err != nil {
 		return nil, err
@@ -94,7 +118,7 @@ func (s *Server) GetConfiguration() ([]byte, *dbus.Error) {
 		return nil, makeError(common.ErrorGamepadReadingFault, err)
 	}
 
-	prot := pb.GetGamepadConfiguration(conf)
+	prot := pb.ConvertGamepadConfiguration(conf)
 
 	data, err := proto.Marshal(prot)
 	if err != nil {
@@ -124,6 +148,53 @@ func (s *Server) SetConfiguration(data []byte) *dbus.Error {
 	conf.ApplyTo(gpConf)
 
 	err = s.gp.SaveConfig(gpConf)
+	if err != nil {
+		return makeError(common.ErrorGamepadWritingFault, err)
+	}
+
+	return nil
+}
+
+func (s *Server) GetLEDConfiguration() ([]byte, *dbus.Error) {
+	if err := s.checkConnected(); err != nil {
+		return nil, err
+	}
+
+	conf, err := s.gp.GetLEDConfig()
+	if err != nil {
+		return nil, makeError(common.ErrorGamepadReadingFault, err)
+	}
+
+	prot := pb.ConvertLEDConfiguration(conf)
+
+	data, err := proto.Marshal(prot)
+	if err != nil {
+		return nil, makeError(common.ErrorMarshallingFault, err)
+	}
+
+	return data, nil
+}
+
+func (s *Server) SetLEDConfiguration(data []byte) *dbus.Error {
+	if err := s.checkConnected(); err != nil {
+		return err
+	}
+
+	var conf pb.LedsConfiguration
+
+	err := proto.Unmarshal(data, &conf)
+	if err != nil {
+		return makeError(common.ErrorMarshallingFault, err)
+	}
+
+	ledConf, err := s.gp.GetLEDConfig()
+	if err != nil {
+		return makeError(common.ErrorGamepadReadingFault, err)
+	}
+
+	conf.ApplyTo(ledConf)
+
+	err = s.gp.SaveLEDConfig(ledConf)
 	if err != nil {
 		return makeError(common.ErrorGamepadWritingFault, err)
 	}

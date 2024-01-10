@@ -10,6 +10,7 @@ import (
 var versionCommand = &cobra.Command{
 	Use:   "version",
 	Short: "Shows version information for flydigictl and flydigid",
+	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		if terseOutput {
 			fmt.Println(version.Version)

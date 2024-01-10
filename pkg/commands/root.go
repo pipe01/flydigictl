@@ -131,3 +131,24 @@ func modifyConfiguration(fn func(conf *pb.GamepadConfiguration)) error {
 
 	return nil
 }
+
+func modifyLEDConfiguration(fn func(conf *pb.LedsConfiguration)) error {
+	if err := connectGamepad(); err != nil {
+		return fmt.Errorf("connect to gamepad: %w", err)
+	}
+	defer disconnectGamepad()
+
+	cfg, err := dbusClient.GetLEDConfiguration()
+	if err != nil {
+		return fmt.Errorf("get config: %w", err)
+	}
+
+	fn(cfg)
+
+	err = dbusClient.SetLEDConfiguration(cfg)
+	if err != nil {
+		return fmt.Errorf("set config: %w", err)
+	}
+
+	return nil
+}

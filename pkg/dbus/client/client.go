@@ -90,6 +90,35 @@ func (c *Client) SetConfiguration(cfg *pb.GamepadConfiguration) error {
 	return nil
 }
 
+func (c *Client) GetLEDConfiguration() (*pb.LedsConfiguration, error) {
+	var cfgBytes []byte
+
+	if err := c.call("GetLEDConfiguration", nil, &cfgBytes); err != nil {
+		return nil, c.wrapError(err)
+	}
+
+	var cfg pb.LedsConfiguration
+
+	if err := proto.Unmarshal(cfgBytes, &cfg); err != nil {
+		return nil, fmt.Errorf("unmarshal config: %w", err)
+	}
+
+	return &cfg, nil
+}
+
+func (c *Client) SetLEDConfiguration(cfg *pb.LedsConfiguration) error {
+	cfgBytes, err := proto.Marshal(cfg)
+	if err != nil {
+		return fmt.Errorf("marshal config: %w", err)
+	}
+
+	if err := c.call("SetLEDConfiguration", []any{cfgBytes}); err != nil {
+		return c.wrapError(err)
+	}
+
+	return nil
+}
+
 func (c *Client) GetDeviceInfo() (*pb.GamepadInfo, error) {
 	var infoBytes []byte
 
