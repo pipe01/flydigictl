@@ -101,7 +101,7 @@ func ConvertLEDConfiguration(bean *config.NewLedConfigBean) *LedsConfiguration {
 }
 
 func (c *LedsConfiguration) ApplyTo(bean *config.NewLedConfigBean) {
-	bean.Light_scale = byte(c.Brightness * 255)
+	bean.Light_scale = byte(c.Brightness * 100)
 
 	switch leds := c.Leds.(type) {
 	case *LedsConfiguration_Off:

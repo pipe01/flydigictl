@@ -86,7 +86,7 @@ func (s *Server) GetServerVersion() (string, *dbus.Error) {
 	return version.Version, nil
 }
 
-func (s *Server) DumpConfiguration() (string, *dbus.Error) {
+func (s *Server) DumpConfiguration(noColor bool) (string, *dbus.Error) {
 	if err := s.checkConnected(); err != nil {
 		return "", err
 	}
@@ -103,7 +103,10 @@ func (s *Server) DumpConfiguration() (string, *dbus.Error) {
 
 	var str strings.Builder
 
-	dump.NewDumper(&str, 0).Dump(conf)
+	dumper := dump.NewDumper(&str, 0)
+	dumper.Options.MaxDepth = 10
+	dumper.Options.NoColor = noColor
+	dumper.Dump(conf)
 
 	return str.String(), nil
 }
@@ -253,6 +256,12 @@ func (s *Server) Listen() error {
 						},
 					},
 					{
+						Name: "DumpConfiguration",
+						Args: []introspect.Arg{
+							{Direction: "in", Type: "b", Name: "noColor"},
+						},
+					},
+					{
 						Name: "GetConfiguration",
 						Args: []introspect.Arg{
 							{Direction: "out", Type: "ay"},
@@ -262,6 +271,24 @@ func (s *Server) Listen() error {
 						Name: "SetConfiguration",
 						Args: []introspect.Arg{
 							{Direction: "in", Type: "ay"},
+						},
+					},
+					{
+						Name: "GetLEDConfiguration",
+						Args: []introspect.Arg{
+							{Direction: "out", Type: "ay"},
+						},
+					},
+					{
+						Name: "SetLEDConfiguration",
+						Args: []introspect.Arg{
+							{Direction: "in", Type: "ay"},
+						},
+					},
+					{
+						Name: "GetDeviceInfo",
+						Args: []introspect.Arg{
+							{Direction: "out", Type: "ay"},
 						},
 					},
 				},

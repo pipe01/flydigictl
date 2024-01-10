@@ -61,6 +61,16 @@ func (c *Client) GetServerVersion() (string, error) {
 	return version, nil
 }
 
+func (c *Client) DumpConfiguration(noColor bool) (string, error) {
+	var dump string
+
+	if err := c.call("DumpConfiguration", []any{noColor}, &dump); err != nil {
+		return "", err
+	}
+
+	return dump, nil
+}
+
 func (c *Client) GetConfiguration() (*pb.GamepadConfiguration, error) {
 	var cfgBytes []byte
 
