@@ -8,24 +8,25 @@ import (
 )
 
 var gamepadNames = map[int32]string{
-	19: "Apex 2",
-	20: "Vader 2",
-	21: "Vader 2",
-	22: "Vader 2 Pro",
-	23: "Vader 2",
-	24: "Apex 3",
-	25: "Direwolf",
-	26: "Apex 3",
-	29: "Apex 3",
-	27: "Direwolf",
-	30: "fp1Fate",
-	28: "Vader 3",
-	80: "Vader 3 Pro",
-	81: "Vader 3 Pro ONE PIECE",
-	82: "Direwolf 2",
-	83: "fp2ip",
-	84: "k2",
-	85: "Vader 4",
+	19:  "Apex 2",
+	20:  "Vader 2",
+	21:  "Vader 2",
+	22:  "Vader 2 Pro",
+	23:  "Vader 2",
+	24:  "Apex 3",
+	25:  "Direwolf",
+	26:  "Apex 3",
+	29:  "Apex 3",
+	27:  "Direwolf",
+	30:  "fp1Fate",
+	28:  "Vader 3",
+	80:  "Vader 3 Pro",
+	81:  "Vader 3 Pro ONE PIECE",
+	82:  "Direwolf 2",
+	83:  "fp2ip",
+	84:  "k2",
+	85:  "Vader 4",
+	105: "Vader 4 Pro",
 }
 
 var infoCommand = &cobra.Command{
@@ -44,6 +45,7 @@ var infoCommand = &cobra.Command{
 				Value any
 			}{
 				{"Device", fmt.Sprintf("%d (%s)", info.DeviceId, gamepadNames[info.DeviceId])},
+				{"Protocol mode", info.ProtocolMode},
 				{"Battery percentage", fmt.Sprintf("%d%%", info.BatteryPercent)},
 				{"Connection type", strings.ToLower(info.ConnectionType.String())},
 				{"CPU", fmt.Sprintf("%s (%s)", info.CpuType, info.CpuName)},

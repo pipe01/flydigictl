@@ -6,6 +6,8 @@ import (
 	"io"
 	"sync"
 	"time"
+
+	"github.com/rs/zerolog/log"
 )
 
 type ConfigWriter struct {
@@ -26,6 +28,8 @@ func NewConfigWriter(w io.Writer) *ConfigWriter {
 
 func (cw *ConfigWriter) Ack(n int) {
 	if cw.isSending {
+		log.Debug().Int("ack", n).Msg("got config write ack")
+
 		select {
 		case cw.chunkack <- n:
 		case <-time.After(1 * time.Second):
@@ -48,6 +52,7 @@ func (cw *ConfigWriter) Send(chunks [][]byte, maxRetries int, chunkTimeout time.
 
 		for !success && retriesLeft > 0 {
 			retriesLeft--
+			log.Debug().Int("chunk", i).Int("remaining_retries", retriesLeft).Msg("writing config chunk")
 
 			_, err := cw.w.Write(chunk)
 			if err != nil {

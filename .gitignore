@@ -2,3 +2,5 @@ testing
 build
 .vscode
 *.deb
+/flydigictl
+/flydigid

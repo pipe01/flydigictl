@@ -7,7 +7,6 @@ require (
 	github.com/google/gousb v1.1.2
 	github.com/karalabe/usb v0.0.2
 	github.com/rs/zerolog v1.31.0
-	pault.ag/go/modprobe v0.1.2
 )
 
 require (
@@ -20,7 +19,6 @@ require (
 	golang.org/x/image v0.15.0 // indirect
 	golang.org/x/sync v0.5.0 // indirect
 	google.golang.org/protobuf v1.32.0 // indirect
-	pault.ag/go/topsort v0.0.0-20160530003732-f98d2ad46e1a // indirect
 )
 
 require (

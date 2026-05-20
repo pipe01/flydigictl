@@ -25,6 +25,11 @@ type MessageWriteGamepadConfigCBK struct {
 	AckNum byte
 }
 
+type MessageGamepadConfigID struct {
+	raw
+	ConfigID byte
+}
+
 type MessageGamePadInfo struct {
 	raw
 	DeviceID         byte

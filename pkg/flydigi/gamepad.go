@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/pipe01/flydigictl/pkg/flydigi/config"
@@ -17,12 +19,26 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-type deviceMode int
+type ProtocolMode string
 
 const (
-	deviceModeXInput deviceMode = iota + 1
-	deviceModeDInput
+	ProtocolModeAuto   ProtocolMode = "auto"
+	ProtocolModeDInput ProtocolMode = "dinput"
+	ProtocolModeXInput ProtocolMode = "xinput"
 )
+
+func ParseProtocolMode(mode string) (ProtocolMode, error) {
+	switch strings.ToLower(strings.TrimSpace(mode)) {
+	case "", "auto":
+		return ProtocolModeAuto, nil
+	case "dinput", "directinput", "hid":
+		return ProtocolModeDInput, nil
+	case "xinput":
+		return ProtocolModeXInput, nil
+	default:
+		return "", fmt.Errorf("unknown protocol mode %q, expected auto, dinput, or xinput", mode)
+	}
+}
 
 type FDGConncetType int32
 
@@ -84,7 +100,8 @@ const (
 type commandCallbackFunc func(data []byte)
 
 type Gamepad struct {
-	prot protocol.Protocol
+	prot         protocol.Protocol
+	protocolMode ProtocolMode
 
 	devInfo *utils.CondValue[FDGDeviceInfo]
 
@@ -93,24 +110,59 @@ type Gamepad struct {
 	currConfig    *utils.CondValue[config.AllConfigBean]
 	currLEDConfig *utils.CondValue[config.NewLedConfigBean]
 
-	configID byte
+	configID atomic.Uint32
 }
 
 func OpenGamepad() (*Gamepad, error) {
-	prot, err := dinput.Open()
-	if err != nil {
-		if err != protocol.ErrGamepadNotPresent {
+	return OpenGamepadWithMode(ProtocolModeAuto)
+}
+
+func OpenGamepadWithMode(mode ProtocolMode) (*Gamepad, error) {
+	var prot protocol.Protocol
+	actualMode := mode
+	var err error
+
+	switch mode {
+	case ProtocolModeAuto:
+		prot, err = dinput.Open()
+		if err != nil {
+			if err != protocol.ErrGamepadNotPresent {
+				return nil, fmt.Errorf("open dinput device: %w", err)
+			}
+
+			prot, err = xinput.Open()
+			if err != nil {
+				return nil, fmt.Errorf("open xinput device: %w", err)
+			}
+			actualMode = ProtocolModeXInput
+		} else {
+			actualMode = ProtocolModeDInput
+		}
+
+	case ProtocolModeDInput:
+		prot, err = dinput.Open()
+		if err != nil {
 			return nil, fmt.Errorf("open dinput device: %w", err)
 		}
 
+	case ProtocolModeXInput:
 		prot, err = xinput.Open()
 		if err != nil {
 			return nil, fmt.Errorf("open xinput device: %w", err)
 		}
+
+	default:
+		return nil, fmt.Errorf("unknown protocol mode %q", mode)
 	}
 
+	return newGamepad(prot, actualMode), nil
+}
+
+func newGamepad(prot protocol.Protocol, mode ProtocolMode) *Gamepad {
 	gamepad := &Gamepad{
-		prot:          prot,
+		prot:         prot,
+		protocolMode: mode,
+
 		closech:       make(chan struct{}),
 		devInfo:       utils.NewCondValue[FDGDeviceInfo](&sync.Mutex{}),
 		currConfig:    utils.NewCondValue[config.AllConfigBean](&sync.Mutex{}),
@@ -118,7 +170,7 @@ func OpenGamepad() (*Gamepad, error) {
 	}
 	go gamepad.readLoop()
 
-	return gamepad, nil
+	return gamepad
 }
 
 func (g *Gamepad) Close() error {
@@ -153,6 +205,9 @@ func (g *Gamepad) handleMessage(msg protocol.Message) error {
 	case protocol.MessageDongleInfo:
 		return g.handleDongleInfo(msg)
 
+	case protocol.MessageGamepadConfigID:
+		return g.handleGamepadConfigID(msg)
+
 	case protocol.MessageGamepadConfigReadCB:
 		return g.handleGamepadConfigRead(msg)
 
@@ -164,12 +219,24 @@ func (g *Gamepad) handleMessage(msg protocol.Message) error {
 	}
 }
 
+func (g *Gamepad) handleGamepadConfigID(msg protocol.MessageGamepadConfigID) error {
+	g.configID.Store(uint32(msg.ConfigID))
+	log.Debug().Uint8("config_id", msg.ConfigID).Msg("got selected config id")
+
+	return nil
+}
+
+func (g *Gamepad) selectedConfigID() byte {
+	return byte(g.configID.Load())
+}
+
 func (g *Gamepad) handleDeviceInfo(msg protocol.MessageGamePadInfo) error {
-	log.Debug().Uint8("deviceid", msg.DeviceID).Msg("got device info")
+	log.Debug().Uint8("deviceid", msg.DeviceID).Uint8("battery", msg.Battery).Msg("got device info")
 
 	devInfo := FDGDeviceInfo{}
 
 	devInfo.DeviceId = int32(msg.DeviceID)
+	devInfo.ConnectMode = string(g.protocolMode)
 	// if (!GameHandleListDic.gameHandleDic.ContainsKey((int)deviceId))
 	// {
 	// 	return;
@@ -188,18 +255,7 @@ func (g *Gamepad) handleDeviceInfo(msg protocol.MessageGamePadInfo) error {
 	devInfo.FirmwareVersionCode = int32(fw_h_2)*1000 + int32(fw_h)*100 + int32(fw_l_2)*10 + int32(fw_l)
 	devInfo.FirmwareVersion = fmt.Sprintf("%d.%d.%d.%d", fw_h_2, fw_h, fw_l_2, fw_l)
 
-	battery := msg.Battery
-	const apex2MinBY = 98
-	const apex2MaxBY = 114
-
-	if battery < apex2MinBY {
-		battery = apex2MinBY
-	} else if battery > apex2MaxBY {
-		battery = apex2MaxBY
-	}
-
-	batteryPercent := int(100 * float32(battery-apex2MinBY) / float32(apex2MaxBY-apex2MinBY))
-	devInfo.BatteryPercent = int32(batteryPercent)
+	devInfo.BatteryPercent = batteryPercent(msg)
 
 	switch msg.MotionSensorType {
 	case 1:
@@ -270,6 +326,30 @@ func (g *Gamepad) handleDeviceInfo(msg protocol.MessageGamePadInfo) error {
 	return nil
 }
 
+func batteryPercent(msg protocol.MessageGamePadInfo) int32 {
+	if msg.DeviceID == 85 || msg.DeviceID == 105 {
+		if msg.Battery <= 4 {
+			return int32(msg.Battery) * 25
+		}
+
+		if msg.Battery <= 100 {
+			return int32(msg.Battery)
+		}
+	}
+
+	battery := msg.Battery
+	const apex2MinBY = 98
+	const apex2MaxBY = 114
+
+	if battery < apex2MinBY {
+		battery = apex2MinBY
+	} else if battery > apex2MaxBY {
+		battery = apex2MaxBY
+	}
+
+	return int32(100 * float32(battery-apex2MinBY) / float32(apex2MaxBY-apex2MinBY))
+}
+
 func (g *Gamepad) handleDongleInfo(msg protocol.MessageDongleInfo) error {
 	fw_l := msg.FW_L & 15
 	fw_l_2 := msg.FW_L >> 4
@@ -293,8 +373,17 @@ func (g *Gamepad) handleDongleInfo(msg protocol.MessageDongleInfo) error {
 func (g *Gamepad) handleGamepadConfigRead(msg protocol.MessageGamepadConfigReadCB) error {
 	log.Debug().Int("length", len(msg.Data)).Msg("got gamepad configuration data")
 
-	cfg, err := config.ConvertGPConfigByByte(msg.Data)
+	deviceId := int32(0)
+	if g.devInfo.Value != nil {
+		deviceId = g.devInfo.Value.DeviceId
+	}
+	cfg, err := config.ConvertGPConfigByByte(msg.Data, deviceId)
 	if err != nil {
+		preview := msg.Data
+		if len(preview) > 32 {
+			preview = preview[:32]
+		}
+		log.Error().Err(err).Bytes("data", preview).Int("length", len(msg.Data)).Int32("device_id", deviceId).Msg("failed to parse gamepad config")
 		return fmt.Errorf("convert GP config: %w", err)
 	}
 
@@ -322,12 +411,13 @@ func (g *Gamepad) handleLEDConfigRead(msg protocol.MessageLEDConfigReadCB) error
 func (g *Gamepad) SaveConfig(cfg *config.AllConfigBean) error {
 	var buf bytes.Buffer
 	config.ConvertByteByGConfig(&buf, cfg)
+	configID := g.selectedConfigID()
 
-	log.Info().Int("length", buf.Len()).Msg("saving gamepad configuration")
+	log.Info().Int("length", buf.Len()).Uint8("config_id", configID).Msg("saving gamepad configuration")
 
 	if err := g.prot.Send(protocol.CommandSendConfig{
 		Data:     buf.Bytes(),
-		ConfigID: g.configID,
+		ConfigID: configID,
 	}); err != nil {
 		return fmt.Errorf("send config: %w", err)
 	}
@@ -348,12 +438,13 @@ func (g *Gamepad) SaveConfig(cfg *config.AllConfigBean) error {
 func (g *Gamepad) SaveLEDConfig(cfg *config.NewLedConfigBean) error {
 	var buf bytes.Buffer
 	config.ConvertByteByNewLedConfig(&buf, cfg)
+	configID := g.selectedConfigID()
 
-	log.Info().Int("length", buf.Len()).Msg("saving led configuration")
+	log.Info().Int("length", buf.Len()).Uint8("config_id", configID).Uint8("led_mode", byte(cfg.LedMode)).Msg("saving led configuration")
 
 	if err := g.prot.Send(protocol.CommandSendLEDConfig{
 		Data:     buf.Bytes(),
-		ConfigID: g.configID,
+		ConfigID: configID,
 	}); err != nil {
 		return fmt.Errorf("send config: %w", err)
 	}
@@ -390,13 +481,27 @@ func getConfigRetry[T any](prot protocol.Protocol, v *utils.CondValue[T], cmd pr
 }
 
 func (g *Gamepad) GetConfig() (*config.AllConfigBean, error) {
-	return getConfigRetry(g.prot, g.currConfig, protocol.CommandReadConfig{ConfigID: g.configID})
+	if g.devInfo.Value == nil {
+		if _, err := g.GetGamepadInfo(); err != nil {
+			return nil, fmt.Errorf("get gamepad info: %w", err)
+		}
+	}
+
+	return getConfigRetry(g.prot, g.currConfig, protocol.CommandReadConfig{ConfigID: g.selectedConfigID()})
 }
 
 func (g *Gamepad) GetLEDConfig() (*config.NewLedConfigBean, error) {
-	return getConfigRetry(g.prot, g.currLEDConfig, protocol.CommandReadLEDConfig{ConfigID: g.configID})
+	return getConfigRetry(g.prot, g.currLEDConfig, protocol.CommandReadLEDConfig{ConfigID: g.selectedConfigID()})
 }
 
 func (g *Gamepad) GetGamepadInfo() (*FDGDeviceInfo, error) {
-	return getConfigRetry(g.prot, g.devInfo, protocol.CommandGetDeviceInfo{})
+	info, err := getConfigRetry(g.prot, g.devInfo, protocol.CommandGetDeviceInfo{})
+	if err != nil {
+		return nil, err
+	}
+	if info.ConnectMode == "" {
+		info.ConnectMode = string(g.protocolMode)
+	}
+
+	return info, nil
 }

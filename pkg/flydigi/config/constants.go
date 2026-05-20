@@ -495,4 +495,5 @@ var GameHandleName = map[int32]string{
 	82: "fp2",
 	83: "fp2ip",
 	84: "k2",
+	105: "v4p",
 }

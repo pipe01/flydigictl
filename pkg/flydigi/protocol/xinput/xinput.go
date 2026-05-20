@@ -12,7 +12,6 @@ import (
 
 	"github.com/google/gousb"
 	"github.com/rs/zerolog/log"
-	"pault.ag/go/modprobe"
 )
 
 const (
@@ -32,8 +31,7 @@ type protocolXInput struct {
 	out    io.Writer
 	closer io.Closer
 
-	isClosed       atomic.Bool
-	xpadWasEnabled bool
+	isClosed atomic.Bool
 
 	msgch chan protocol.Message
 
@@ -69,10 +67,8 @@ func Open() (protocol.Protocol, error) {
 	}
 	closers.AddCloser(cfg)
 
-	err = modprobe.Remove("xpad")
-	xpadWasEnabled := err == nil
-	if xpadWasEnabled {
-		log.Debug().Msg("unloaded xpad module")
+	if err := dev.SetAutoDetach(true); err != nil {
+		return nil, fmt.Errorf("enable kernel driver auto-detach: %w", err)
 	}
 
 	intf, err := cfg.Interface(0, 0)
@@ -95,7 +91,6 @@ func Open() (protocol.Protocol, error) {
 		in:              inep,
 		out:             outep,
 		closer:          &closers,
-		xpadWasEnabled:  xpadWasEnabled,
 		msgch:           make(chan protocol.Message, 10),
 		configReader:    internal.NewConfigReader(packageLength, 10),
 		ledConfigReader: internal.NewConfigReader(ledPackageLength, 10),
@@ -111,17 +106,7 @@ func (d *protocolXInput) Close() error {
 		return nil
 	}
 
-	err := d.closer.Close()
-	if d.xpadWasEnabled {
-		log.Debug().Msg("loading xpad module")
-
-		err = modprobe.Load("xpad", "")
-		if err != nil {
-			log.Err(err).Msg("failed to load xpad module")
-		}
-	}
-
-	return err
+	return d.closer.Close()
 }
 
 func (d *protocolXInput) Messages() <-chan protocol.Message {
@@ -174,7 +159,9 @@ func (d *protocolXInput) resolveUsbData(p []byte) (protocol.Message, bool) {
 			}, true
 
 		case 32:
-			// HandleGamepadConfigId
+			return protocol.MessageGamepadConfigID{
+				ConfigID: p[16],
+			}, true
 
 		case 34:
 			// HandleGamepadConfigReadCB

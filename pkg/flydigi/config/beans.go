@@ -72,6 +72,16 @@ type NewLedConfigBean struct {
 	LedGroups   []*LedGroup
 }
 
+func (b *NewLedConfigBean) SetOff() {
+	b.LedMode = LedModeOff
+	b.Rgb_num = 0
+	b.Loop_End = 0
+	b.Type = 0
+	b.LedGroups = utils.RepeatFunc(func() *LedGroup {
+		return &LedGroup{Units: utils.RepeatFunc(func() *LedUnit { return &LedUnit{} }, 10)}
+	}, 16)
+}
+
 func (b *NewLedConfigBean) SetSteady(color LedUnit) {
 	b.LedMode = LedModeSteady
 	b.Rgb_num = 5
@@ -93,6 +103,49 @@ func (b *NewLedConfigBean) SetStreamlined(speed float32) {
 	b.Loop_time = 100 - byte(speed*100)
 	b.Rgb_num = 5
 	b.LedGroups = getLedGroupList(0, 5)
+}
+
+func (b *NewLedConfigBean) SetBreathing(color LedUnit, speed float32) {
+	b.LedMode = LedModeBreathing
+	b.Loop_End = 5
+	b.Loop_time = 100 - byte(speed*100)
+	b.Rgb_num = 5
+	b.Type = 0
+	b.LedGroups = utils.RepeatFunc(func() *LedGroup { return &LedGroup{} }, 16)
+
+	for _, g := range b.LedGroups[:b.Rgb_num] {
+		c := color
+
+		g.Units = utils.RepeatFunc(func() *LedUnit { return &LedUnit{} }, 10)
+		g.Units[0] = &c
+	}
+}
+
+func (b *NewLedConfigBean) SetGradient(start, end LedUnit, speed float32) {
+	b.LedMode = LedModeGradient
+	b.Loop_End = 1
+	b.Loop_time = 100 - byte(speed*100)
+	b.Rgb_num = 5
+	b.Type = 0
+	b.LedGroups = utils.RepeatFunc(func() *LedGroup { return &LedGroup{} }, 16)
+
+	for _, g := range b.LedGroups[:b.Rgb_num] {
+		s := start
+		e := end
+
+		g.Units = utils.RepeatFunc(func() *LedUnit { return &LedUnit{} }, 10)
+		g.Units[0] = &s
+		g.Units[1] = &e
+	}
+}
+
+func (b *NewLedConfigBean) SetFeedback(speed float32) {
+	b.LedMode = LedModeFeedback
+	b.Loop_End = 5
+	b.Loop_time = 100 - byte(speed*100)
+	b.Rgb_num = 5
+	b.Type = 0
+	b.LedGroups = getLedGroupList(3, 5)
 }
 
 type LedGroup struct {

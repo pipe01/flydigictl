@@ -15,15 +15,26 @@ message GamepadInfo {
     ConnectionType connection_type = 3;
     string cpu_type = 4;
     string cpu_name = 5;
+    string protocol_mode = 6;
 }
 
 message GamepadConfiguration {
     JoystickConfiguration left_joystick = 1;
     JoystickConfiguration right_joystick = 2;
+    repeated ButtonMapping button_mappings = 3;
 }
 
 message JoystickConfiguration {
     int32 deadzone = 1;
+}
+
+message ButtonMapping {
+    int32 key_id = 1;
+    string key = 2;
+    int32 mapped_key_id = 3;
+    string mapped_key = 4;
+    bool is_own = 5;
+    bool is_mapped = 6;
 }
 
 message LedsOff {
@@ -37,12 +48,30 @@ message LedsStreamlined {
     float speed = 1;
 }
 
+message LedsBreathing {
+    Color color = 1;
+    float speed = 2;
+}
+
+message LedsGradient {
+    Color start_color = 1;
+    Color end_color = 2;
+    float speed = 3;
+}
+
+message LedsFeedback {
+    float speed = 1;
+}
+
 message LedsConfiguration {
     float brightness = 1;
     oneof leds {
         LedsOff off = 10;
         LedsSteady steady = 12;
         LedsStreamlined streamlined = 13;
+        LedsGradient gradient = 14;
+        LedsBreathing breathing = 15;
+        LedsFeedback feedback = 16;
     }
 }
 

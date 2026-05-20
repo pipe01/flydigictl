@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/rs/zerolog/log"
 	"golang.org/x/text/encoding/simplifiedchinese"
 )
 
@@ -521,6 +522,12 @@ var (
 			true, true, false, false, true, false, false, true, false, false,
 			false, false,
 		},
+		105: []bool{
+			true, true, true, true, true, true, true, true, true, true,
+			true, true, true, true, true, true, true, true, true, true,
+			true, true, false, false, true, false, false, true, false, false,
+			false, false,
+		},
 	}
 	defaultKeyOwnsSetDic = []bool{
 		true, true, true, true, true, true, true, true, true, true,
@@ -529,8 +536,6 @@ var (
 		false, false,
 	}
 )
-
-const deviceId = 80 // Vader 3 Pro
 
 type configLists struct {
 	configVersion, configName, configPackageLength, led, keyMapping, joyMapping,
@@ -554,13 +559,23 @@ func getConfigListsV2(data []byte) configLists {
 	}
 }
 
-func ConvertGPConfigByByte(data []byte) (*AllConfigBean, error) {
+func ConvertGPConfigByByte(data []byte, deviceId int32) (*AllConfigBean, error) {
 	var cfg AllConfigBean
 
-	if data[0] != 0 || data[1] < 1 {
+	if len(data) < 2 {
+		return nil, errors.New("config data too short")
+	}
+
+	if (data[0] != 0 && data[0] != 1) || data[1] < 1 {
+		preview := data
+		if len(preview) > 32 {
+			preview = preview[:32]
+		}
+		log.Warn().Bytes("header", preview).Int("length", len(data)).Msg("unexpected config version bytes, treating as default config")
 		return nil, errors.New("default config")
 	}
-	if data[1] < 2 {
+	if data[0] == 0 && data[1] < 2 {
+		log.Warn().Bytes("version", data[:2]).Msg("config V1 detected, not supported")
 		return nil, errors.New("can't parse config V1")
 	}
 
@@ -580,7 +595,7 @@ func ConvertGPConfigByByte(data []byte) (*AllConfigBean, error) {
 	}
 	cfg.Name = string(n)
 	cfg.Basic = getBasicByListByte(lists.led, lists.motor, lists.lunpan)
-	cfg.KeyMapping = getKeyMappingByListByte(lists.keyMapping)
+	cfg.KeyMapping = getKeyMappingByListByte(lists.keyMapping, deviceId)
 	cfg.JoyMapping = getJoyMappingByListByte(lists.joyMapping)
 	cfg.TriggerMapping = getTriggerMappingByListByte(lists.triggerMapping, lists.autoTrigger, lists.triggerMotor)
 	cfg.MotionMapping = getMotionMappingByListByte(lists.motionMapping)
@@ -659,7 +674,7 @@ func getLunpanMappingByListByte(data []byte) *LunPanMappingBean {
 	return &LunPanMappingBean{}
 }
 
-func getKeyMappingByListByte(data []byte) []*KeyMappingBean {
+func getKeyMappingByListByte(data []byte, deviceId int32) []*KeyMappingBean {
 	list := make([]*KeyMappingBean, 0)
 
 	if len(data) > 96 {
@@ -695,7 +710,7 @@ func getKeyMappingByListByte(data []byte) []*KeyMappingBean {
 			IsShowPic:    gamepadKeyConfigDic[i].IsShowPic,
 		}
 
-		if owns, ok := keyOwnSetsDic[deviceId]; ok {
+		if owns, ok := keyOwnSetsDic[int(deviceId)]; ok {
 			mapping.IsOwn = owns[i]
 		} else {
 			mapping.IsOwn = defaultKeyOwnsSetDic[i]
