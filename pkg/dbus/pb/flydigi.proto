@@ -20,10 +20,58 @@ message GamepadInfo {
 message GamepadConfiguration {
     JoystickConfiguration left_joystick = 1;
     JoystickConfiguration right_joystick = 2;
+
+    TriggerConfiguration left_trigger = 3;
+    TriggerConfiguration right_trigger = 4;
 }
 
 message JoystickConfiguration {
     int32 deadzone = 1;
+}
+
+message TriggerConfiguration {
+    oneof mode {
+        TriggerDefault default = 10;
+        TriggerRace race = 11;
+        TriggerRecoil recoil = 12;
+        TriggerSniper sniper = 13;
+        TriggerLock lock = 14;
+        TriggerVibration vibration = 15;
+    }
+}
+
+message TriggerDefault {
+}
+
+message TriggerRace {
+    int32 initialPos = 1;
+    int32 pressure = 2;
+}
+
+message TriggerRecoil {
+    int32 initialPos = 1;
+    int32 initialStrength = 2;
+    int32 intensity = 3;
+    int32 frequency = 4;
+    bool inputAfter = 5;
+}
+
+message TriggerSniper {
+    int32 initialPos = 1;
+    int32 length = 2;
+    int32 pressure = 3;
+    bool inputAfter = 4;
+}
+
+message TriggerLock {
+    int32 initialPos = 1;
+}
+
+message TriggerVibration {
+    int32 coefficient = 1;
+    int32 threshold = 2;
+    int32 travelRange = 3;
+    int32 frequency = 4;
 }
 
 message LedsOff {
@@ -37,12 +85,18 @@ message LedsStreamlined {
     float speed = 1;
 }
 
+message LedsGradient {
+    float speed = 1;
+    repeated Color colors = 2;
+}
+
 message LedsConfiguration {
     float brightness = 1;
     oneof leds {
         LedsOff off = 10;
         LedsSteady steady = 12;
         LedsStreamlined streamlined = 13;
+        LedsGradient gradient = 15;
     }
 }
 

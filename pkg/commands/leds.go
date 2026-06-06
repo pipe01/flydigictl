@@ -30,7 +30,20 @@ var ledsCommand = &cobra.Command{
 
 			case *pb.LedsConfiguration_Streamlined:
 				fmt.Printf("Streamlined, speed %.0f%%\n", leds.Streamlined.Speed*100)
-			}
+
+			case *pb.LedsConfiguration_Gradient:
+				fmt.Printf("Gradient, speed %.0f%%\n", leds.Gradient.Speed*100)
+
+				for i, c := range leds.Gradient.Colors {
+					r, g, b := c.RGB()
+					fmt.Printf("  %d: #%02X%02X%02X (%d, %d, %d)\n",
+						i,
+						r, g, b,
+						r, g, b,
+					)
+				}
+
+			}			
 
 			return nil
 		})
@@ -75,13 +88,57 @@ var ledsStreamlinedCommand = &cobra.Command{
 	},
 }
 
+var gradientSpeed float32
+var ledsGradientCommand = &cobra.Command{
+	Use:   "gradient <color1> <color2> [color3 ... color9]",
+	Short: "Sets LEDs to a gradient effect",
+	Args: func(cmd *cobra.Command, args []string) error {
+		if len(args) < 2 {
+			return fmt.Errorf("gradient requires at least 2 colors")
+		}
+		if len(args) > 9 {
+			return fmt.Errorf("gradient supports at most 9 colors")
+		}
+		return nil
+	},
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return useConnection(func() error {
+			colors := make([]*pb.Color, 0, len(args))
+
+			for _, hex := range args {
+				color, ok := pb.ColorFromName(hex)
+				if !ok {
+					color, ok = pb.ColorFromHex(hex)
+					if !ok {
+						return errInvalidColor
+					}
+				}
+				colors = append(colors, color)
+			}
+
+			return modifyLEDConfiguration(func(conf *pb.LedsConfiguration) {
+				conf.Brightness = ledsBrightness
+				conf.Leds = &pb.LedsConfiguration_Gradient{
+					Gradient: &pb.LedsGradient{
+						Speed:  gradientSpeed,
+						Colors: colors,
+					},
+				}
+			})
+		})
+	},
+}
+
+
 func init() {
 	rootCmd.AddCommand(ledsCommand)
 
 	ledsCommand.AddCommand(ledsSteadyCommand)
 	ledsCommand.AddCommand(ledsStreamlinedCommand)
+	ledsCommand.AddCommand(ledsGradientCommand)
 
 	ledsCommand.PersistentFlags().Float32VarP(&ledsBrightness, "brightness", "b", 1, "led brightness (0.0-1.0)")
 
 	ledsStreamlinedCommand.Flags().Float32VarP(&streamlinedSpeed, "speed", "s", 0.5, "speed for the effect (0.0-1.0)")
+	ledsGradientCommand.Flags().Float32VarP(&gradientSpeed, "speed", "s", 0.5, "speed for the effect (0.0-1.0)")
 }

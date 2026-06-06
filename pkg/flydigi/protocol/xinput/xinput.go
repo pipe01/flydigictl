@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
+	"os/exec"
 	"sync/atomic"
 	"time"
 
@@ -118,7 +120,17 @@ func (d *protocolXInput) Close() error {
 
 		err = modprobe.Load("xpad", "")
 		if err != nil {
-			log.Err(err).Msg("failed to load xpad module")
+			log.Debug().Msg("failed to load xpad module with package, trying exec")
+			cmd := exec.Command("modprobe", "xpad")
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			err = cmd.Run()
+
+			if err != nil {
+				log.Err(err).Msg("failed to load xpad with exec")
+			} else {
+				log.Debug().Msg("xpad loaded")
+			}
 		}
 	}
 

@@ -49,12 +49,16 @@ func ConvertGamepadConfiguration(bean *config.AllConfigBean) *GamepadConfigurati
 	return &GamepadConfiguration{
 		LeftJoystick:  ConvertJoystickConfiguration(bean.JoyMapping.LeftJoystic),
 		RightJoystick: ConvertJoystickConfiguration(bean.JoyMapping.RightJoystic),
+		LeftTrigger:   ConvertTriggerConfiguration(bean.TriggerMapping.LeftTrigger),
+		RightTrigger:  ConvertTriggerConfiguration(bean.TriggerMapping.RightTrigger),
 	}
 }
 
 func (c *GamepadConfiguration) ApplyTo(bean *config.AllConfigBean) {
 	c.LeftJoystick.ApplyTo(bean.JoyMapping.LeftJoystic)
 	c.RightJoystick.ApplyTo(bean.JoyMapping.RightJoystic)
+	c.LeftTrigger.ApplyTo(bean.TriggerMapping.LeftTrigger)
+	c.RightTrigger.ApplyTo(bean.TriggerMapping.RightTrigger)
 }
 
 func ConvertJoystickConfiguration(bean *config.JoyStickBean) *JoystickConfiguration {
@@ -65,6 +69,89 @@ func ConvertJoystickConfiguration(bean *config.JoyStickBean) *JoystickConfigurat
 
 func (c *JoystickConfiguration) ApplyTo(bean *config.JoyStickBean) {
 	bean.Curve.Zero = c.Deadzone
+}
+
+func ConvertTriggerConfiguration(bean *config.Trigger) *TriggerConfiguration {
+	var mode isTriggerConfiguration_Mode
+
+	switch bean.AutoTrigger.Mode {
+	case 0:
+		mode = &TriggerConfiguration_Default{}
+	case 1:
+		mode = &TriggerConfiguration_Race{
+			Race: &TriggerRace{
+				InitialPos: bean.AutoTrigger.MixedParams[0],
+				Pressure:   bean.AutoTrigger.MixedParams[1],
+			},
+		}
+	case 2:
+		mode = &TriggerConfiguration_Recoil{
+			Recoil: &TriggerRecoil{
+				InitialPos:      bean.AutoTrigger.MixedParams[0],
+				InitialStrength: bean.AutoTrigger.MixedParams[1],
+				Intensity:       bean.AutoTrigger.MixedParams[2],
+				Frequency:       bean.AutoTrigger.MixedParams[3],
+				InputAfter:      bean.AutoTrigger.MixedParams[4] == 1,
+			},
+		}
+	case 3:
+		mode = &TriggerConfiguration_Sniper{
+			Sniper: &TriggerSniper{
+				InitialPos: bean.AutoTrigger.MixedParams[0],
+				Length:     bean.AutoTrigger.MixedParams[1],
+				Pressure:   bean.AutoTrigger.MixedParams[2],
+				InputAfter: bean.AutoTrigger.MixedParams[4] == 1,
+			},
+		}
+	case 4:
+		mode = &TriggerConfiguration_Lock{
+			Lock: &TriggerLock{
+				InitialPos: bean.AutoTrigger.MixedParams[0],
+			},
+		}
+	case 5:
+		mode = &TriggerConfiguration_Vibration{
+			Vibration: &TriggerVibration{
+				Coefficient: bean.AutoTrigger.VibrationBind.Scale,
+				Threshold:   bean.AutoTrigger.VibrationBind.MinFilter,
+				TravelRange: bean.AutoTrigger.VibrationBind.TriggerParams[0],
+				Frequency:   bean.AutoTrigger.VibrationBind.TriggerParams[3],
+			},
+		}
+	}
+
+	return &TriggerConfiguration{
+		Mode: mode,
+	}
+}
+
+func (c *TriggerConfiguration) ApplyTo(bean *config.Trigger) {
+	if bean == nil {
+		return
+	}
+
+	switch mode := c.Mode.(type) {
+	case *TriggerConfiguration_Default:
+		bean.ApplyDefaultTrigger()
+	case *TriggerConfiguration_Race:
+		bean.ApplyRaceTrigger(mode.Race.InitialPos, mode.Race.Pressure)
+	case *TriggerConfiguration_Recoil:
+		outputInt := int32(0)
+		if mode.Recoil.InputAfter {
+			outputInt = 1
+		}
+		bean.ApplyRecoilTrigger(mode.Recoil.InitialPos, mode.Recoil.InitialStrength, mode.Recoil.Intensity, mode.Recoil.Frequency, outputInt)
+	case *TriggerConfiguration_Sniper:
+		outputInt := int32(0)
+		if mode.Sniper.InputAfter {
+			outputInt = 1
+		}
+		bean.ApplySniperTrigger(mode.Sniper.InitialPos, mode.Sniper.Length, mode.Sniper.Pressure, outputInt)
+	case *TriggerConfiguration_Lock:
+		bean.ApplyLockTrigger(mode.Lock.InitialPos)
+	case *TriggerConfiguration_Vibration:
+		bean.ApplyVibrationTrigger(mode.Vibration.Coefficient, mode.Vibration.Threshold, mode.Vibration.TravelRange, mode.Vibration.Frequency)
+	}
 }
 
 func ConvertLEDConfiguration(bean *config.NewLedConfigBean) *LedsConfiguration {
@@ -89,6 +176,30 @@ func ConvertLEDConfiguration(bean *config.NewLedConfigBean) *LedsConfiguration {
 				Speed: float32(100-bean.Loop_time) / 100,
 			},
 		}
+	case config.LedModeGradient:
+		colors := make([]*Color, 0)
+
+		if bean.Rgb_num > 0 && len(bean.LedGroups) > 0 {
+			group := bean.LedGroups[0]
+
+			for i := 0; i < int(bean.Rgb_num) && i < len(group.Units); i++ {
+				unit := group.Units[i]
+				if unit == nil {
+					continue
+				}
+
+				colors = append(colors, &Color{
+					Rgb: int32(unit.R)<<16 | int32(unit.G)<<8 | int32(unit.B),
+				})
+			}
+		}
+
+		leds = &LedsConfiguration_Gradient{
+			Gradient: &LedsGradient{
+				Speed:  float32(100-bean.Loop_time) / 100,
+				Colors: colors,
+			},
+		}
 
 	default:
 		panic("TODO: implement")
@@ -111,5 +222,22 @@ func (c *LedsConfiguration) ApplyTo(bean *config.NewLedConfigBean) {
 
 	case *LedsConfiguration_Streamlined:
 		bean.SetStreamlined(leds.Streamlined.Speed)
+
+	case *LedsConfiguration_Gradient:
+		g := leds.Gradient
+
+		colors := make([]config.LedUnit, 0, len(g.Colors))
+		for _, c := range g.Colors {
+			if c == nil {
+				continue
+			}
+			colors = append(colors, *c.LedUnit())
+		}
+
+		if len(colors) < 2 {
+			return
+		}
+
+		bean.SetGradient(colors, g.Speed)
 	}
 }

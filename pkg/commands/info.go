@@ -24,7 +24,7 @@ var gamepadNames = map[int32]string{
 	81: "Vader 3 Pro ONE PIECE",
 	82: "Direwolf 2",
 	83: "fp2ip",
-	84: "k2",
+	84: "Apex 4",
 	85: "Vader 4",
 }
 

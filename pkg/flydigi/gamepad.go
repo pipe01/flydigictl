@@ -190,8 +190,13 @@ func (g *Gamepad) handleDeviceInfo(msg protocol.MessageGamePadInfo) error {
 	devInfo.FirmwareVersion = fmt.Sprintf("%d.%d.%d.%d", fw_h_2, fw_h, fw_l_2, fw_l)
 
 	battery := msg.Battery
-	const apex2MinBY = 98
-	const apex2MaxBY = 114
+	var apex2MinBY byte = 98
+	var apex2MaxBY byte = 114
+
+	if devInfo.DeviceId == 84 {
+		apex2MinBY = 0
+		apex2MaxBY = 4
+	}
 
 	if battery < apex2MinBY {
 		battery = apex2MinBY
@@ -200,6 +205,24 @@ func (g *Gamepad) handleDeviceInfo(msg protocol.MessageGamePadInfo) error {
 	}
 
 	batteryPercent := int(100 * float32(battery-apex2MinBY) / float32(apex2MaxBY-apex2MinBY))
+
+	if devInfo.DeviceId == 84 {
+		switch battery {
+		case 0:
+			batteryPercent = 15
+		case 1:
+			batteryPercent = 25
+		case 2:
+			batteryPercent = 50
+		case 3:
+			batteryPercent = 75
+		case 4:
+			batteryPercent = 100
+		default:
+			batteryPercent = 100
+		}
+	}
+
 	devInfo.BatteryPercent = int32(batteryPercent)
 
 	switch msg.MotionSensorType {
