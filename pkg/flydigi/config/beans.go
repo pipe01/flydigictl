@@ -87,6 +87,13 @@ func (b *NewLedConfigBean) SetSteady(color LedUnit) {
 	}
 }
 
+func (b *NewLedConfigBean) SetOff() {
+	// Reuse the steady layout with a black color so the packet structure is
+	// always valid, then flip the mode.
+	b.SetSteady(LedUnit{})
+	b.LedMode = LedModeOff
+}
+
 func (b *NewLedConfigBean) SetStreamlined(speed float32) {
 	b.LedMode = LedModeStreamlined
 	b.Loop_End = 5
