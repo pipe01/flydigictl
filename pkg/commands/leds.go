@@ -39,6 +39,17 @@ var ledsCommand = &cobra.Command{
 
 var ledsBrightness float32
 
+var ledsOffCommand = &cobra.Command{
+	Use:   "off",
+	Short: "Turns all LEDs off",
+	Args:  cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return modifyLEDConfiguration(func(conf *pb.LedsConfiguration) {
+			conf.Leds = &pb.LedsConfiguration_Off{}
+		})
+	},
+}
+
 var ledsSteadyCommand = &cobra.Command{
 	Use:     "steady",
 	Short:   "Sets all LEDs to a solid color",
@@ -78,6 +89,7 @@ var ledsStreamlinedCommand = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(ledsCommand)
 
+	ledsCommand.AddCommand(ledsOffCommand)
 	ledsCommand.AddCommand(ledsSteadyCommand)
 	ledsCommand.AddCommand(ledsStreamlinedCommand)
 
