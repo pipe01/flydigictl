@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os/exec"
 	"sync/atomic"
 	"time"
 
@@ -32,9 +33,10 @@ type protocolXInput struct {
 	in     *gousb.InEndpoint
 	out    *gousb.OutEndpoint
 	closer io.Closer
+	dev    *gousb.Device
+	usbctx *gousb.Context
 
-	isClosed       atomic.Bool
-	xpadWasEnabled bool
+	isClosed atomic.Bool
 
 	msgch chan protocol.Message
 
@@ -52,17 +54,18 @@ func Open() (protocol.Protocol, error) {
 		return desc.Vendor == 0x045e && desc.Product == 0x028e
 	})
 	if err != nil {
+		ctx.Close()
 		return nil, fmt.Errorf("enumerate devices: %w", err)
 	}
 
 	log.Debug().Int("count", len(devs)).Msg("found xinput usb devices")
 
 	if len(devs) == 0 {
+		ctx.Close()
 		return nil, protocol.ErrGamepadNotPresent
 	}
 
 	dev := devs[0]
-	closers.AddCloser(dev)
 
 	cfg, err := dev.Config(1)
 	if err != nil {
@@ -70,9 +73,7 @@ func Open() (protocol.Protocol, error) {
 	}
 	closers.AddCloser(cfg)
 
-	err = modprobe.Remove("xpad")
-	xpadWasEnabled := err == nil
-	if xpadWasEnabled {
+	if err := modprobe.Remove("xpad"); err == nil {
 		log.Debug().Msg("unloaded xpad module")
 	}
 
@@ -96,7 +97,8 @@ func Open() (protocol.Protocol, error) {
 		in:              inep,
 		out:             outep,
 		closer:          &closers,
-		xpadWasEnabled:  xpadWasEnabled,
+		dev:             dev,
+		usbctx:          ctx,
 		msgch:           make(chan protocol.Message, 10),
 		configReader:    internal.NewConfigReader(packageLength, 10),
 		ledConfigReader: internal.NewConfigReader(ledPackageLength, 10),
@@ -113,13 +115,24 @@ func (d *protocolXInput) Close() error {
 	}
 
 	err := d.closer.Close()
-	if d.xpadWasEnabled {
-		log.Debug().Msg("loading xpad module")
 
-		err = modprobe.Load("xpad", "")
-		if err != nil {
-			log.Err(err).Msg("failed to load xpad module")
-		}
+	// Reset the device so it re-enumerates cleanly and xpad can pick it up
+	// again; without this the controller is often left unresponsive until
+	// power-cycled by hand.
+	if rerr := d.dev.Reset(); rerr != nil {
+		log.Debug().Err(rerr).Msg("failed to reset usb device")
+	}
+	d.dev.Close()
+	d.usbctx.Close()
+
+	// Always reload xpad, even if this session wasn't the one that unloaded
+	// it (e.g. a previous crashed session left it out) — otherwise the
+	// controller stays dead as a gamepad until someone loads it by hand.
+	// The system modprobe is used because the Go library can't load the
+	// compressed modules (.ko.xz/.ko.zst) that most distros ship nowadays.
+	log.Debug().Msg("loading xpad module")
+	if out, lerr := exec.Command("modprobe", "xpad").CombinedOutput(); lerr != nil {
+		log.Err(lerr).Str("output", string(out)).Msg("failed to load xpad module")
 	}
 
 	return err
@@ -154,6 +167,12 @@ func (d *protocolXInput) readLoop() {
 }
 
 func (d *protocolXInput) resolveUsbData(p []byte) (protocol.Message, bool) {
+	// Vendor packets are at least 28 bytes; anything shorter is a regular
+	// gamepad report and indexing it below would panic.
+	if len(p) < 28 {
+		return nil, false
+	}
+
 	if p[14] == 0xA5 {
 		switch p[15] {
 		case 16:
