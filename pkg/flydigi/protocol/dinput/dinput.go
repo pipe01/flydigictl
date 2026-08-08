@@ -153,6 +153,14 @@ func (d *protocolDInput) sendCommand(cmd byte, args ...byte) error {
 }
 
 func (d *protocolDInput) resolveUsbData(p []byte) (msg protocol.Message, ok bool) {
+	// Gamepad state packets stream continuously and carry sensor data in the
+	// bytes that the checks below look at, so they must be filtered out first:
+	// otherwise they are randomly mistaken for config chunks or write acks,
+	// corrupting reads and writes intermittently.
+	if len(p) >= 2 && p[0] == 0x04 && p[1] == 0xFE {
+		return nil, false
+	}
+
 	if p[15] == 235 {
 		d.configReader.GotPackage(int(p[3]), p[5:15])
 

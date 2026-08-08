@@ -6,7 +6,6 @@ import (
 	"os"
 
 	"github.com/pipe01/flydigictl/pkg/dbus/server"
-	"github.com/pipe01/flydigictl/pkg/flydigi"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"

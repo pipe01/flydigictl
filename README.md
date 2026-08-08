@@ -5,10 +5,10 @@ A utility for managing the configuration of [Flydigi](https://en.flydigi.com/) c
 Currently supported:
 
 - Vader 3 Pro
+- Vader 3 Pro ONE PIECE
 
 Not tested but probably will work:
 
-- Vader 3 Pro ONE PIECE
 - Vader 3
 - Vader 2
 - Direwolf 2

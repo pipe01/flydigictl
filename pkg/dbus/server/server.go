@@ -65,7 +65,11 @@ func (s *Server) Connect() *dbus.Error {
 
 		<-closech
 
-		s.gp = nil
+		s.connectmu.Lock()
+		if s.gp == dev {
+			s.gp = nil
+		}
+		s.connectmu.Unlock()
 	}()
 
 	s.gp = dev
@@ -73,6 +77,9 @@ func (s *Server) Connect() *dbus.Error {
 }
 
 func (s *Server) Disconnect() *dbus.Error {
+	s.connectmu.Lock()
+	defer s.connectmu.Unlock()
+
 	if err := s.checkConnected(); err != nil {
 		return err
 	}
@@ -80,6 +87,11 @@ func (s *Server) Disconnect() *dbus.Error {
 	if err := s.gp.Close(); err != nil {
 		log.Err(err).Msg("failed to close gamepad")
 	}
+
+	// Clear the connection right away instead of waiting for the read loop to
+	// notice the close: on a dead USB handle it may never exit, which would
+	// leave the daemon stuck returning this zombie connection forever.
+	s.gp = nil
 
 	return nil
 }

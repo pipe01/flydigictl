@@ -42,7 +42,7 @@ func (c *Color) RGB() (r, g, b byte) {
 
 func (c *Color) LedUnit() *config.LedUnit {
 	r, g, b := c.RGB()
-	return &config.LedUnit{r, g, b}
+	return &config.LedUnit{R: r, G: g, B: b}
 }
 
 func ConvertGamepadConfiguration(bean *config.AllConfigBean) *GamepadConfiguration {
@@ -91,7 +91,10 @@ func ConvertLEDConfiguration(bean *config.NewLedConfigBean) *LedsConfiguration {
 		}
 
 	default:
-		panic("TODO: implement")
+		// Modes not modeled yet (breathing, gradient, feedback) are reported
+		// as off instead of crashing; writing back a full configuration will
+		// replace them.
+		leds = &LedsConfiguration_Off{}
 	}
 
 	return &LedsConfiguration{
@@ -105,6 +108,7 @@ func (c *LedsConfiguration) ApplyTo(bean *config.NewLedConfigBean) {
 
 	switch leds := c.Leds.(type) {
 	case *LedsConfiguration_Off:
+		bean.SetOff()
 
 	case *LedsConfiguration_Steady:
 		bean.SetSteady(*leds.Steady.Color.LedUnit())

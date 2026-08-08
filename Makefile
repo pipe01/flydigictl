@@ -50,7 +50,8 @@ deb: deb-clean bin-daemon bin-ctl
 	rm -rf $(DEB_FULLNAME)
 
 install: bin-daemon bin-ctl
-	mv flydigid flydigictl /usr/bin
+	install -m 755 flydigid flydigictl /usr/bin
+	rm -f flydigid flydigictl
 	cp $(SRC)/etc/flydigid.conf /etc/dbus-1/system.d
 	cp $(SRC)/etc/flydigid.service /usr/lib/systemd/system
 	cp $(SRC)/etc/com.pipe01.flydigi.Gamepad.service /usr/share/dbus-1/system-services
