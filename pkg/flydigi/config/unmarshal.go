@@ -701,7 +701,14 @@ func getKeyMappingByListByte(data []byte) []*KeyMappingBean {
 			mapping.IsOwn = defaultKeyOwnsSetDic[i]
 		}
 
-		if mapping.Turbo > 0 {
+		if readMapKeyId == 254 {
+			// 254 marks a button handled outside the gamepad mapping (e.g. a
+			// keyboard mapping set by Space Station); keep it so that saving
+			// the config back doesn't silently revert the button.
+			mapping.MapType = KeyMapTypeKeyboard
+			mapping.MapKey = "none"
+			mapping.IsMap = true
+		} else if mapping.Turbo > 0 {
 			mapping.MapType = KeyMapTypeBurst
 		} else {
 			mapping.MapType = KeyMapTypeGamePad
